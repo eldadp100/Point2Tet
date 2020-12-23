@@ -50,6 +50,32 @@ class Tetrahedron:
 
         calculate_and_update_neighborhood(neighborhood_candidates)
 
+    @staticmethod
+    def determinant(mat):
+        a = mat[0][0]
+        b = mat[0][1]
+        c = mat[0][2]
+        d = mat[1][0]
+        e = mat[1][1]
+        f = mat[1][2]
+        g = mat[2][0]
+        h = mat[2][1]
+        i = mat[2][2]
+
+        return (
+                a * e * i +
+                b * f * g +
+                c * d * h -
+                c * e * g -
+                b * d * i -
+                a * f * h
+        )
+
+
+    def calculate_volume(self):
+        return Tetrahedron.determinant(self.vertices) / 6
+
+
 
 def calculate_and_update_neighborhood(list_of_tetrahedrons):
     for tet1 in list_of_tetrahedrons:
@@ -80,19 +106,17 @@ class UnitCube:
 
 
 class QuarTet:
-
     def __init__(self, depth):
         # We start with 3D grid NxNxN and devide each child-cube to 5 tetrahedrons
         # unit cube:
-
-        curr_tetrahedrons = UnitCube().divide()
+        self.curr_tetrahedrons = UnitCube().divide()
         for _ in range(depth):
             tmp_curr_tetrahedrons = []
-            for tet in curr_tetrahedrons:
+            for tet in self.curr_tetrahedrons:
                 tmp_curr_tetrahedrons += tet.sub_divide()
             for tet in tmp_curr_tetrahedrons:
                 tet.update_after_all_finish_sub_divide()
-            curr_tetrahedrons = tmp_curr_tetrahedrons
+            self.curr_tetrahedrons = tmp_curr_tetrahedrons
 
     def update_by_deltas(self, vertices_deltas):
         pass
@@ -100,3 +124,27 @@ class QuarTet:
     def init_occupancy_with_SDF(self, SDF):
         # TODO: that will improve results
         pass
+
+    def __iter__(self):
+        return self.curr_tetrahedrons.__iter__()
+
+
+    def get_occupied_tets(self):
+        result = []
+        for tet in self:
+            if tet.occupancy == 1:
+                result.append(tet)
+        return result
+
+
+    def sample_point_cloud(self, pc_size):
+        samples = []
+        occupied_tets = self.get_occupied_tets()
+        volumes = [tet.volume() for tet in occupied_tets]
+        volumes_total = sum(volumes)
+
+        points_count = [int(np.round((volume / volumes_total) * pc_size)) for volume in volumes]
+
+        for i, tet in enumerate(occupied_tets):
+            for _ in points_count[i]:
+                samples.append(sum([vertex * np.random.uniform(0, 1) for vertex in tet.vertices]))

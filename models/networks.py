@@ -2,14 +2,23 @@ import torch
 import torch.nn as nn
 from torch import optim
 
+from structures.QuarTet import QuarTet, Tetrahedron
+
+NEIGHBORHOOD_SIZE = 5
+
 
 class MotherCubeConv(nn.Module):
     def __init__(self, in_features, out_features):
         super(MotherCubeConv, self).__init__()
-        pass
+        self.conv = nn.Linear(NEIGHBORHOOD_SIZE * in_features, out_features)
 
-    def forward(self, mother_cube):
-        pass
+    def forward(self, mother_cube: QuarTet):
+        for tet in mother_cube:
+            neighborhood_features = [tet.features]
+            for n_tet in tet.neighborhood:
+                neighborhood_features.append(n_tet.features)
+            neighborhood_features = torch.cat(neighborhood_features, dim=0)
+            tet.features = self.conv(neighborhood_features)
 
 
 class MotherCubePool(nn.Module):
@@ -27,9 +36,14 @@ class MotherCubePool(nn.Module):
 class TetCNN_PP(nn.Module):
     def __init__(self, ncf):
         super(TetCNN_PP, self).__init__()
+        for i, num_features in enumerate(ncf[:-1]):
+            setattr(self, f'conv{i}', MotherCubeConv(num_features, ncf[i + 1]))
+            # setattr(self, f'pool{i}', MotherCubePool(num_features, ))
 
     def forward(self, mother_cube):
-        pass
+        for i in range(len(self.ncf)):
+            mother_cube = getattr(self, f'conv{i}')(mother_cube)
+
 
 
 class OurNet(nn.Module):
