@@ -7,7 +7,7 @@ class Tetrahedron:
         self.vertices = vertices
         self.occupancy = np.random.choice([0, 1])  # very small chance to all be 0
         self.neighborhood = set()
-
+        self.features = self.vertices.permute(1, 0).sum()
         self.sub_divided = None
 
     def add_neighbor(self, neighbor):
