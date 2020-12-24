@@ -1,5 +1,4 @@
 import open3d
-import numpy as np
 
 def visualize_quartet(quartet):  
     vertex_index = 0
@@ -9,7 +8,7 @@ def visualize_quartet(quartet):
     for tet in quartet:
         tetra = []
         for vert in tet.vertices:
-            vertices.append(vert.loc.cpu().detach().numpy())
+            vertices.append(vert.cpu().detach().numpy())
             tetra.append(vertex_index)
             vertex_index += 1
         tetras.append(tetra)

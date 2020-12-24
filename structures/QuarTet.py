@@ -11,7 +11,7 @@ class Tetrahedron:
         self.vertices = vertices
         self.occupancy = np.random.choice([0, 1])  # very small chance to all be 0
         self.neighborhood = set()
-        self.features = torch.stack(self.vertices).permute(1, 0).sum() / 4
+        self.features = torch.stack(self.vertices).permute(1, 0).sum() / 4.
         self.sub_divided = None
         self.pooled = False
         self.depth = depth
