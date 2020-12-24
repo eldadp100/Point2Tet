@@ -7,8 +7,9 @@ class Tetrahedron:
         self.vertices = vertices
         self.occupancy = np.random.choice([0, 1])  # very small chance to all be 0
         self.neighborhood = set()
-        self.features = self.vertices.permute(1, 0).sum()
+        self.features = self.vertices.permute(1, 0).sum() / 4
         self.sub_divided = None
+        self.pooled = False
 
     def add_neighbor(self, neighbor):
         self.neighborhood.add(neighbor)
@@ -50,6 +51,15 @@ class Tetrahedron:
 
         calculate_and_update_neighborhood(neighborhood_candidates)
 
+    def __hash__(self):
+        return (self.vertices[0], self.vertices[1], self.vertices[2], self.vertices[3]).__hash__()
+
+    def update_by_deltas(self, vertices_deltas):
+        new_vertices = []
+        for i, v in enumerate(self.vertices):
+            new_vertices.append(v + vertices_deltas[i])
+        self.vertices = new_vertices
+        
     @staticmethod
     def determinant(mat):
         a = mat[0][0]
@@ -76,7 +86,6 @@ class Tetrahedron:
         return Tetrahedron.determinant(self.vertices) / 6
 
 
-
 def calculate_and_update_neighborhood(list_of_tetrahedrons):
     for tet1 in list_of_tetrahedrons:
         for tet2 in list_of_tetrahedrons:
@@ -89,6 +98,24 @@ class Vertex:
     def __init__(self, x, y, z):
         self.loc = torch.tensor([x, y, z])
         self.features = self.loc  # TODO: maybe add more features (e.g. noraml)
+
+    def __hash__(self):
+        return self.loc.__hash__()
+
+
+def intersect(tet1, tet2):
+    return set(tet1.vertices).intersection(set(tet2.vertices))
+
+
+class Face:
+    def __init__(self, tet1, tet2):
+        assert tet1.is_neighbor(tet2)
+        self.tet1 = tet1
+        self.tet2 = tet2
+        self.face_coords = intersect(self.tet1.vertices, self.tet2.vertices)
+
+    def get_tets(self):
+        return self.tet1, self.tet2
 
 
 class UnitCube:
@@ -118,12 +145,26 @@ class QuarTet:
                 tet.update_after_all_finish_sub_divide()
             self.curr_tetrahedrons = tmp_curr_tetrahedrons
 
-    def update_by_deltas(self, vertices_deltas):
-        pass
-
     def init_occupancy_with_SDF(self, SDF):
         # TODO: that will improve results
         pass
+
+    def sample_disjoint_faces(self, N):
+        faces = []
+        visited_tets = set()
+        sampled_indices = np.random.randint(0, len(self.curr_tetrahedrons) - 1, size=N)
+        for idx in sampled_indices:
+            tet = self.curr_tetrahedrons[idx]
+            if tet in visited_tets:
+                continue
+
+            neighbor = np.random.choice(tet.neighborhood)
+            visited_tets.add(tet)
+            visited_tets.add(neighbor)
+            faces.append(Face(tet, neighbor))
+
+        return faces
+
 
     def __iter__(self):
         return self.curr_tetrahedrons.__iter__()
