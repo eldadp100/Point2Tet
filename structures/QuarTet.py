@@ -82,7 +82,7 @@ class Tetrahedron:
                 a * f * h
         )
 
-    def calculate_volume(self):
+    def volume(self):
         return Tetrahedron.determinant(self.vertices) / 6
 
 
@@ -194,8 +194,10 @@ class QuarTet:
         points_count = [int(np.round((volume / volumes_total) * pc_size)) for volume in volumes]
 
         for i, tet in enumerate(occupied_tets):
-            for _ in points_count[i]:
+            for _ in range(points_count[i]):
                 samples.append(sum([vertex * np.random.uniform(0, 1) for vertex in tet.vertices]))
+
+        return samples
 
 
 if __name__ == '__main__':
@@ -204,5 +206,7 @@ if __name__ == '__main__':
         print(len(tet.neighborhood))
     b = a.sample_disjoint_faces(4)
     c = a.get_occupied_tets()
+    d = a.sample_point_cloud(100)
     print(b)
     print(c)
+    print(d)
