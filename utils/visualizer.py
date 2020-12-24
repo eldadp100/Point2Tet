@@ -14,8 +14,15 @@ def visualize_quartet(quartet):
             vertex_index += 1
         tetras.append(tetra)
 
-    tetra_mesh = open3d.geometry.TetraMesh()
-    tetra_mesh.vertices.extend(vertices)
-    tetra_mesh.tetras.extend(tetras)
+    o3d_tetra_mesh = open3d.geometry.TetraMesh()
+    o3d_tetra_mesh.vertices.extend(vertices)
+    o3d_tetra_mesh.tetras.extend(tetras)
 
-    open3d.visualization.draw_geometries([tetra_mesh], mesh_show_back_face=True)
+    open3d.visualization.draw_geometries([o3d_tetra_mesh], mesh_show_back_face=True)
+
+def visualize_pointcloud(pc):
+    points = pc.points.cpu().detach().numpy()
+    points = open3d.utility.Vector3dVector(points)
+    o3d_pc = open3d.geometry.PointCloud(points)
+    
+    open3d.visualization.draw_geometries([o3d_pc])
