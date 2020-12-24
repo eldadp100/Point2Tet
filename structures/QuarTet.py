@@ -154,6 +154,12 @@ class QuarTet:
 
             self.curr_tetrahedrons = tmp_curr_tetrahedrons
         calculate_and_update_neighborhood(self.curr_tetrahedrons)
+        self.fill_neighbors()
+
+    def fill_neighbors(self):
+        for tet in self.curr_tetrahedrons:
+            for i in range(4 - len(tet.neighborhood)):
+                tet.add_neighbor(tet)
 
     def init_occupancy_with_SDF(self, SDF):
         # TODO: that will improve results
@@ -201,6 +207,8 @@ class QuarTet:
 
 if __name__ == '__main__':
     a = QuarTet(2)
+    for tet in a:
+        print(len(tet.neighborhood))
     b = a.sample_disjoint_faces(4)
     c = a.get_occupied_tets()
     print(b)
