@@ -1,8 +1,9 @@
-from structures.QuarTet import Tetrahedron
+from structures.QuarTet import *
 from utils.visualizer import visualize_quartet
 
 def main():
-    tet = Tetrahedron()
+    quartet = QuarTet(0)
+    visualize_quartet(quartet)
 
 if __name__ == "__main__":
     main()
