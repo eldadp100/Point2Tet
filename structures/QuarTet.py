@@ -11,7 +11,7 @@ class Tetrahedron:
         self.vertices = vertices
         self.occupancy = np.random.choice([0, 1])  # very small chance to all be 0
         self.neighborhood = set()
-        self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum() / 4
+        self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4
         self.sub_divided = None
         self.pooled = False
 
@@ -104,7 +104,7 @@ def calculate_and_update_neighborhood(list_of_tetrahedrons):
 
 class Vertex:
     def __init__(self, x, y, z):
-        self.loc = torch.tensor([x, y, z])
+        self.loc = torch.tensor([x, y, z], dtype=torch.float64)
         self.features = self.loc  # TODO: maybe add more features (e.g. noraml)
 
     def __hash__(self):

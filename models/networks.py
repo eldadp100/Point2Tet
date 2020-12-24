@@ -43,6 +43,7 @@ class MotherCubePool(nn.Module):
 class TetCNN_PP(nn.Module):
     def __init__(self, ncf):
         super(TetCNN_PP, self).__init__()
+        self.ncf = ncf
         for i, num_features in enumerate(ncf[:-1]):
             setattr(self, f'conv{i}', MotherCubeConv(num_features, ncf[i + 1]))
             # setattr(self, f'pool{i}', MotherCubePool(num_features, ))
@@ -95,3 +96,13 @@ def init_net(opts, device):
 
     return net, optimizer, scheduler
 
+
+def main():
+    MotherCube = QuarTet(0)
+    net = OurNet()
+    print(net)
+    print(net(MotherCube))
+
+
+if __name__ == "__main__":
+    main()
