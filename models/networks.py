@@ -94,3 +94,4 @@ def init_net(opts, device):
     scheduler = get_scheduler(opts.iterations, optimizer)
 
     return net, optimizer, scheduler
+

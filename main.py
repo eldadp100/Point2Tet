@@ -17,7 +17,7 @@ print('device: {}'.format(device))
 
 # mesh = Mesh(opts.mesh_to_read, device=device, hold_history=True)
 
-quartet = QuarTet(10)
+quartet = QuarTet(5)
 
 # input point cloud
 input_xyz, input_normals = utils.read_pts(opts.input_pc)
@@ -25,11 +25,12 @@ input_xyz = torch.Tensor(input_xyz).type(torch.FloatTensor).to(device)[None, :, 
 input_normals = torch.Tensor(input_normals).type(torch.FloatTensor).to(device)[None, :, :]
 
 # normalize point cloud to [0,1]^3 (Unit Cube)
-input_xyz -= input_xyz.permute(1, 0).mean(dim=1)  # TODO: Here might be a bug
-input_xyz /= 2 * input_xyz.permute(1, 0).max(dim=1)  # TODO: Here might be a bug
+input_xyz -= input_xyz.permute(1, 0).mean(dim=1)
+input_xyz /= 2 * input_xyz.permute(1, 0).max(dim=1)
 input_xyz += 0.5
+# TODO: add normals normalization
 
-net, optimizer, scheduler = init_net(opts, device, )
+net, optimizer, scheduler = init_net(opts, device)
 
 for i in range(opts.iterations):
     # TODO: Subdivide every opts.upsamp
