@@ -48,9 +48,22 @@ class Tetrahedron:
                 new_tet = Tetrahedron(new_tet, depth=self.depth + 1)
                 ret_tets.append(new_tet)
 
+                # parent neighbors
+                new_tet.add_neighbor(self)
+                for neighbor in self.neighborhood:
+                    new_tet.add_neighbor(neighbor)
             self.sub_divided = ret_tets
 
         return self.sub_divided
+
+    def update_after_all_finish_sub_divide(self):
+        neighborhood_candidates = []
+        for tet in self.neighborhood:
+            neighborhood_candidates.extend(tet.sub_divide())
+
+        # delete all olds (with depth<self.depth)
+        calculate_and_update_neighborhood(neighborhood_candidates)
+        self.neighborhood = {nei for nei in self.neighborhood if nei.depth == self.depth and nei != self}
 
     def __hash__(self):
         return (self.vertices[0], self.vertices[1], self.vertices[2], self.vertices[3]).__hash__()
@@ -97,6 +110,7 @@ def calculate_and_update_neighborhood(list_of_tetrahedrons):
 class Vertex:
     def __init__(self, x, y, z):
         self.loc = torch.tensor([x, y, z])
+        self.features = self.loc  # TODO: maybe add more features (e.g. noraml)
 
     def __hash__(self):
         return self.loc.__hash__()
@@ -106,15 +120,7 @@ class Vertex:
 
 
 def intersect(tet1, tet2):
-    intersection = []
-    for v1 in tet1.vertices:
-        exist = False
-        for v2 in tet2.vertices:
-            if tensors_eq(v1.loc, v2.loc):
-                exist = True
-        if exist:
-            intersection.append(v1)
-    return intersection
+    return set(tet1.vertices).intersection(set(tet2.vertices))
 
 
 class Face:
@@ -122,7 +128,7 @@ class Face:
         assert tet1.is_neighbor(tet2)
         self.tet1 = tet1
         self.tet2 = tet2
-        self.face_coords = intersect(self.tet1, self.tet2)
+        self.face_coords = intersect(self.tet1.vertices, self.tet2.vertices)
 
     def get_tets(self):
         return self.tet1, self.tet2
@@ -147,19 +153,20 @@ class QuarTet:
         # We start with 3D grid NxNxN and devide each child-cube to 5 tetrahedrons
         # unit cube:
         self.curr_tetrahedrons = UnitCube().divide()
+        calculate_and_update_neighborhood(self.curr_tetrahedrons)
         for _ in range(depth):
             tmp_curr_tetrahedrons = []
             for tet in self.curr_tetrahedrons:
                 tmp_curr_tetrahedrons += tet.sub_divide()
-
+            for tet in tmp_curr_tetrahedrons:
+                tet.update_after_all_finish_sub_divide()
             self.curr_tetrahedrons = tmp_curr_tetrahedrons
-        calculate_and_update_neighborhood(self.curr_tetrahedrons)
 
     def init_occupancy_with_SDF(self, SDF):
         # TODO: that will improve results
         pass
 
-    def sample_disjoint_faces(self, N):  # TODO: do it exact N
+    def sample_disjoint_faces(self, N):
         faces = []
         visited_tets = set()
         sampled_indices = np.random.randint(0, len(self.curr_tetrahedrons), size=N)
@@ -169,7 +176,7 @@ class QuarTet:
                 continue
 
             neighbor_idx = np.random.randint(0, len(tet.neighborhood))
-            neighbor = list(tet.neighborhood)[neighbor_idx]
+            neighbor = tet.neighborhood[neighbor_idx]
             visited_tets.add(tet)
             visited_tets.add(neighbor)
             faces.append(Face(tet, neighbor))
@@ -201,7 +208,4 @@ class QuarTet:
 
 if __name__ == '__main__':
     a = QuarTet(2)
-    b = a.sample_disjoint_faces(4)
-    c = a.get_occupied_tets()
-    print(b)
-    print(c)
+    a.sample_disjoint_faces(4)
