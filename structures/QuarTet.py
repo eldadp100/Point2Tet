@@ -11,7 +11,7 @@ class Tetrahedron:
         self.vertices = vertices
         self.occupancy = np.random.choice([0, 1])  # very small chance to all be 0
         self.neighborhood = set()
-        self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum() / 4
+        self.features = torch.stack(self.vertices).permute(1, 0).sum() / 4
         self.sub_divided = None
         self.pooled = False
         self.depth = depth
@@ -26,14 +26,14 @@ class Tetrahedron:
         c = 0
         for v1 in self.vertices:
             for v2 in other.vertices:
-                if tensors_eq(v1.loc, v2.loc):
+                if tensors_eq(v1, v2):
                     c += 1
         return c == 3
 
     def get_center(self):
-        a = torch.stack([v.loc for v in self.vertices])
+        a = torch.stack([v for v in self.vertices])
         loc = a.permute(1, 0).sum(dim=1) / 4
-        return Vertex(loc[0], loc[1], loc[2])
+        return loc
 
     def sub_divide(self):
         if self.sub_divided is None:
@@ -42,7 +42,7 @@ class Tetrahedron:
             for remove_vertex in self.vertices:
                 new_tet = []
                 for v in self.vertices:
-                    if v != remove_vertex:
+                    if not tensors_eq(v, remove_vertex):
                         new_tet.append(v)
                 new_tet.append(center)
                 new_tet = Tetrahedron(new_tet, depth=self.depth + 1)
@@ -94,23 +94,12 @@ def calculate_and_update_neighborhood(list_of_tetrahedrons):
                 tet2.add_neighbor(tet1)
 
 
-class Vertex:
-    def __init__(self, x, y, z):
-        self.loc = torch.tensor([x, y, z])
-
-    def __hash__(self):
-        return self.loc.__hash__()
-
-    def to_tensor(self):
-        return self.loc
-
-
 def intersect(tet1, tet2):
     intersection = []
     for v1 in tet1.vertices:
         exist = False
         for v2 in tet2.vertices:
-            if tensors_eq(v1.loc, v2.loc):
+            if tensors_eq(v1, v2):
                 exist = True
         if exist:
             intersection.append(v1)
@@ -126,6 +115,10 @@ class Face:
 
     def get_tets(self):
         return self.tet1, self.tet2
+
+
+def Vertex(x, y, z):
+    return torch.tensor([x, y, z])
 
 
 class UnitCube:
