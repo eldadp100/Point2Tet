@@ -35,31 +35,12 @@ class Tetrahedron:
         loc = a.permute(1, 0).sum(dim=1) / 4.
         return Vertex(pos[0], pos[1], pos[2])
 
-    def sub_divide(self):
-        if self.sub_divided is None:
-            ret_tets = []
-            center = self.get_center()
-            for remove_vertex in self.vertices:
-                new_tet = []
-                for v in self.vertices:
-                    if not tensors_eq(v, remove_vertex):
-                        new_tet.append(v)
-                new_tet.append(center)
-                new_tet = Tetrahedron(new_tet, depth=self.depth + 1)
-                ret_tets.append(new_tet)
-
-            self.sub_divided = ret_tets
-
-        return self.sub_divided
-
     def __hash__(self):
         return (self.vertices[0], self.vertices[1], self.vertices[2], self.vertices[3]).__hash__()
 
     def update_by_deltas(self, vertices_deltas):
-        new_vertices = []
         for i, v in enumerate(self.vertices):
-            new_vertices.append(v + vertices_deltas[i])
-        self.vertices = new_vertices
+            v.update_vertex(vertices_deltas[i])
 
     @staticmethod
     def determinant(mat):
@@ -82,8 +63,8 @@ class Tetrahedron:
                 a * f * h
         )
 
-    def calculate_volume(self):
-        return Tetrahedron.determinant(self.vertices) / 6
+    def volume(self):
+        return Tetrahedron.determinant([v.loc for v in self.vertices]) / 6
 
     def translate(self, vec):
         for vert in self.vertices:
@@ -103,7 +84,7 @@ def intersect(tet1, tet2):
     for v1 in tet1.vertices:
         exist = False
         for v2 in tet2.vertices:
-            if tensors_eq(v1, v2):
+            if tensors_eq(v1.loc, v2.loc):
                 exist = True
         if exist:
             intersection.append(v1)
@@ -124,6 +105,12 @@ class Face:
 class Vertex:
     def __init__(self, x, y, z):
         self.pos = torch.tensor([x, y, z])
+
+    def update_vertex(self, move_vector):
+        self.pos += move_vector
+
+    def __hash__(self):
+        return self.pos.__hash__()
 
     def translate(self, vec):
         self.pos += vec
@@ -192,6 +179,7 @@ class QuarTet:
             self.curr_tetrahedrons = tmp_curr_tetrahedrons
         calculate_and_update_neighborhood(self.curr_tetrahedrons)
         self.fill_neighbors()
+        self.merge_same_vertices()
 
     def __init__(self, n):
         self.curr_tetrahedrons = []
@@ -210,6 +198,18 @@ class QuarTet:
             for i in range(4 - len(tet.neighborhood)):
                 tet.add_neighbor(tet)
 
+    def merge_same_vertices(self):
+        all_vertices = {}
+        for tet in self.curr_tetrahedrons:
+            for v in tet.vertices:
+                all_vertices[v] = v
+
+        for tet in self.curr_tetrahedrons:
+            new_vertices = []
+            for v in tet.vertices:
+                new_vertices.append(all_vertices[v])
+            tet.vertices = new_vertices
+
     def init_occupancy_with_SDF(self, SDF):
         # TODO: that will improve results
         pass
@@ -225,9 +225,10 @@ class QuarTet:
 
             neighbor_idx = np.random.randint(0, len(tet.neighborhood))
             neighbor = list(tet.neighborhood)[neighbor_idx]
-            visited_tets.add(tet)
-            visited_tets.add(neighbor)
-            faces.append(Face(tet, neighbor))
+            if neighbor != tet:
+                visited_tets.add(tet)
+                visited_tets.add(neighbor)
+                faces.append(Face(tet, neighbor))
 
         return faces
 
@@ -250,6 +251,19 @@ class QuarTet:
         points_count = [int(np.round((volume / volumes_total) * pc_size)) for volume in volumes]
 
         for i, tet in enumerate(occupied_tets):
-            for _ in points_count[i]:
-                samples.append(sum([vertex * np.random.uniform(0, 1) for vertex in tet.vertices]))
+            for _ in range(points_count[i]):
+                samples.append(sum([vertex.loc * np.random.uniform(0, 1) for vertex in tet.vertices]))
 
+        return samples
+
+
+if __name__ == '__main__':
+    a = QuarTet(2)
+    for tet in a:
+        print(len(tet.neighborhood))
+    b = a.sample_disjoint_faces(4)
+    c = a.get_occupied_tets()
+    d = a.sample_point_cloud(100)
+    print(b)
+    print(c)
+    print(d)

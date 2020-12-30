@@ -1,16 +1,13 @@
 import torch
 from models.networks import init_net
 import utils
-from models.losses import chamfer_distance
+from models.losses import chamfer_distance_quartet_to_point_cloud
 from options import Options
 import time
-import os
-
 from structures.QuarTet import QuarTet
 
 options = Options()
 opts = options.args
-
 torch.manual_seed(opts.torch_seed)
 device = torch.device('cuda:{}'.format(opts.gpu) if torch.cuda.is_available() else torch.device('cpu'))
 print('device: {}'.format(device))
@@ -36,42 +33,11 @@ for i in range(opts.iterations):
     # TODO: Subdivide every opts.upsamp
 
     iter_start_time = time.time()
-    # Apply network: quartet = net(quartet)
-    # loss = calculate chamfer
-    # update network
-
+    net(quartet) # in place changes
+    loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz)
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
     # scheduler.step()
 
     iter_end_time = time.time()
-
-    # print iteration summary
-    # if i % 1 == 0:
-    #     print(f'{os.path.basename(opts.input_pc)}; iter: {i} out of: {opts.iterations}; loss: {loss.item():.4f};'
-    #           f' sample count: {num_samples}; time: {end_time - start_time:.2f}')
-    # if i % opts.export_interval == 0 and i > 0:
-    #     print('exporting reconstruction... current LR: {}'.format(optimizer.param_groups[0]['lr']))
-    #     with torch.no_grad():
-    #         part_mesh.export(os.path.join(opts.save_path, f'recon_iter_{i}.obj'))
-    #
-    # if (i > 0 and (i + 1) % opts.upsamp == 0):
-    #     mesh = part_mesh.main_mesh
-    #     num_faces = int(np.clip(len(mesh.faces) * 1.5, len(mesh.faces), opts.max_faces))
-    #
-    #     if num_faces > len(mesh.faces) or opts.manifold_always:
-    #         # up-sample mesh
-    #         mesh = utils.manifold_upsample(mesh, opts.save_path, Mesh,
-    #                                        num_faces=min(num_faces, opts.max_faces),
-    #                                        res=opts.manifold_res, simplify=True)
-    #
-    #         part_mesh = PartMesh(mesh, num_parts=options.get_num_parts(len(mesh.faces)), bfs_depth=opts.overlap)
-    #         print(f'upsampled to {len(mesh.faces)} faces; number of parts {part_mesh.n_submeshes}')
-    #         net, optimizer, rand_verts, scheduler = init_net(mesh, part_mesh, device, opts)
-    #         if i < opts.beamgap_iterations:
-    #             print('beamgap updated')
-    #             beamgap_loss.update_pm(part_mesh, input_xyz)
-
-with torch.no_grad():
-    quartet.export(os.path.join(opts.save_path, 'last_recon.obj'))
