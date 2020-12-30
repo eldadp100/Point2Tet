@@ -107,7 +107,7 @@ class Vertex:
     device = None
 
     def __init__(self, x, y, z):
-        self.loc = torch.tensor([x, y, z], device=Vertex.device, dtype=torch.FloatTensor)
+        self.loc = torch.tensor([x, y, z], device=Vertex.device, dtype=torch.float32)
         print(self.loc.device)
 
     def update_vertex(self, move_vector):
@@ -247,7 +247,7 @@ class QuarTet:
 
 
 if __name__ == '__main__':
-    a = QuarTet(2)
+    a = QuarTet(2, 'cpu')
     for tet in a:
         print(len(tet.neighborhood))
     b = a.sample_disjoint_faces(4)
