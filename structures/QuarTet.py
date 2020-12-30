@@ -111,7 +111,8 @@ class Vertex:
         self.loc += move_vector
 
     def __hash__(self):
-        return self.loc.__hash__()
+        x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
+        return (x, y, z).__hash__()
 
 
 class UnitCube:
@@ -182,7 +183,7 @@ class QuarTet:
             tet.features = tet.features.to(device)
             tet.prev_features = tet.prev_features.to(device)
             for i in range(4):
-                tet.vertices[i] = tet.vertices[i].loc.to(device)
+                tet.vertices[i].loc = tet.vertices[i].loc.to(device)
 
 
     def fill_neighbors(self):
