@@ -11,7 +11,7 @@ class Tetrahedron:
         self.vertices = vertices
         self.occupancy = np.random.choice([0, 1])  # very small chance to all be 0
         self.neighborhood = set()
-        self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum() / 4
+        self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum() / 4.
         self.sub_divided = None
         self.pooled = False
         self.depth = depth
@@ -32,8 +32,8 @@ class Tetrahedron:
 
     def get_center(self):
         a = torch.stack([v.loc for v in self.vertices])
-        loc = a.permute(1, 0).sum(dim=1) / 4
-        return loc
+        loc = a.permute(1, 0).sum(dim=1) / 4.
+        return Vertex(loc[0], loc[1], loc[2])
 
     def __hash__(self):
         return (self.vertices[0], self.vertices[1], self.vertices[2], self.vertices[3]).__hash__()
@@ -65,6 +65,10 @@ class Tetrahedron:
 
     def volume(self):
         return Tetrahedron.determinant([v.loc for v in self.vertices]) / 6
+
+    def translate(self, vec):
+        for vert in self.vertices:
+            vert.update_vertex(vec)
 
 
 def calculate_and_update_neighborhood(list_of_tetrahedrons):
@@ -109,9 +113,10 @@ class Vertex:
         return self.loc.__hash__()
 
 
+
 class UnitCube:
-    def __init__(self):
-        pass
+    def __init__(self, pos):
+        self.pos = pos
 
     def divide_to_24(self):
         # (000) (010) (001) (011) --> (0 0.5 0.5)
@@ -150,22 +155,29 @@ class UnitCube:
         tri23 = Tetrahedron([Vertex(0, 0, 1), Vertex(1, 0, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
         tri24 = Tetrahedron([Vertex(0, 0, 1), Vertex(0, 1, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
 
-        return [tri1, tri2, tri3, tri4, tri5, tri6, tri7, tri8, tri9, tri10, tri11, tri12, tri13, tri14, tri15,
+        tets = [tri1, tri2, tri3, tri4, tri5, tri6, tri7, tri8, tri9, tri10, tri11, tri12, tri13, tri14, tri15,
                 tri16, tri17, tri18, tri19, tri20, tri21, tri22, tri23, tri24]
 
-    def divide(self):
-        return self.divide_to_24()
+        for tet in tets:
+            tet.translate(self.pos)
+
+        return tets
 
 
 class QuarTet:
-    def __init__(self, depth):
-        # We start with 3D grid NxNxN and devide each child-cube to 5 tetrahedrons
-        # unit cube:
-        self.curr_tetrahedrons = UnitCube().divide()
+    def __init__(self, n):
+        self.curr_tetrahedrons = []
+        for x in range(n):
+            for y in range(n):
+                for z in range(n):
+                    pos = torch.tensor([x, y, z])
+                    tets = UnitCube(pos).divide_to_24()
+                    self.curr_tetrahedrons.extend(tets)
+
         calculate_and_update_neighborhood(self.curr_tetrahedrons)
         self.fill_neighbors()
         self.merge_same_vertices()
-
+        
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
             for i in range(4 - len(tet.neighborhood)):
