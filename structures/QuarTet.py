@@ -179,8 +179,11 @@ class QuarTet:
         self.merge_same_vertices()
 
         for tet in self.curr_tetrahedrons:
+            tet.features = tet.features.to(device)
+            tet.prev_features = tet.prev_features.to(device)
             for i in range(4):
                 tet.vertices[i] = tet.vertices[i].loc.to(device)
+
 
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
