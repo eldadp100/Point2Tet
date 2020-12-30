@@ -11,7 +11,7 @@ class Tetrahedron:
         self.vertices = vertices
         self.occupancy = np.random.choice([0, 1])  # very small chance to all be 0
         self.neighborhood = set()
-        self.features = torch.stack(self.vertices).permute(1, 0).sum() / 4.
+        self.features = torch.stack([v.pos for v in self.vertices]).permute(1, 0).sum() / 4.
         self.sub_divided = None
         self.pooled = False
         self.depth = depth
@@ -26,14 +26,14 @@ class Tetrahedron:
         c = 0
         for v1 in self.vertices:
             for v2 in other.vertices:
-                if tensors_eq(v1, v2):
+                if tensors_eq(v1.pos, v2.pos):
                     c += 1
         return c == 3
 
     def get_center(self):
-        a = torch.stack([v for v in self.vertices])
-        loc = a.permute(1, 0).sum(dim=1) / 4
-        return loc
+        a = torch.stack([v.pos for v in self.vertices])
+        loc = a.permute(1, 0).sum(dim=1) / 4.
+        return Vertex(pos[0], pos[1], pos[2])
 
     def sub_divide(self):
         if self.sub_divided is None:
@@ -85,6 +85,10 @@ class Tetrahedron:
     def calculate_volume(self):
         return Tetrahedron.determinant(self.vertices) / 6
 
+    def translate(self, vec):
+        for vert in self.vertices:
+            vert.translate(vec)
+
 
 def calculate_and_update_neighborhood(list_of_tetrahedrons):
     for tet1 in list_of_tetrahedrons:
@@ -117,29 +121,69 @@ class Face:
         return self.tet1, self.tet2
 
 
-def Vertex(x, y, z):
-    return torch.tensor([x, y, z])
+class Vertex:
+    def __init__(self, x, y, z):
+        self.pos = torch.tensor([x, y, z])
+
+    def translate(self, vec):
+        self.pos += vec
 
 
 class UnitCube:
-    def __init__(self):
-        pass
+    def __init__(self, pos):
+        self.pos = pos
 
-    def divide(self):
-        tri1 = Tetrahedron([Vertex(0, 1, 0), Vertex(0, 1, 1), Vertex(1, 1, 1), Vertex(0, 0, 1)])
-        tri2 = Tetrahedron([Vertex(0, 1, 0), Vertex(1, 1, 1), Vertex(0, 0, 1), Vertex(1, 0, 0)])
-        tri3 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0, 0, 1), Vertex(0, 1, 0)])
-        tri4 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 0, 1), Vertex(0, 0, 1), Vertex(1, 1, 1)])
-        tri5 = Tetrahedron([Vertex(0, 1, 0), Vertex(1, 0, 0), Vertex(1, 1, 1), Vertex(1, 1, 0)])
+    def divide_to_24(self):
+        # (000) (010) (001) (011) --> (0 0.5 0.5)
+        tri1 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 1, 0), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri2 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 0, 1), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri3 = Tetrahedron([Vertex(0, 1, 1), Vertex(0, 1, 0), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri4 = Tetrahedron([Vertex(0, 1, 1), Vertex(0, 0, 1), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
 
-        return [tri1, tri2, tri3, tri4, tri5]
+        # (000) (100) (010) (110) --> (0.5 0.5 0)
+        tri5 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
+        tri6 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 1, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
+        tri7 = Tetrahedron([Vertex(1, 1, 0), Vertex(1, 0, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
+        tri8 = Tetrahedron([Vertex(1, 1, 0), Vertex(0, 1, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
+
+        # (000) (100) (001) (101) --> (0.5 0 0.5)
+        tri9 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri10 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 0, 1), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri11 = Tetrahedron([Vertex(1, 0, 1), Vertex(1, 0, 0), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri12 = Tetrahedron([Vertex(1, 0, 1), Vertex(0, 0, 1), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
+
+        # (111) (011) (110) (010) --> (1 0.5 0.5)
+        tri13 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 1, 0), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri14 = Tetrahedron([Vertex(1, 1, 1), Vertex(0, 1, 1), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri15 = Tetrahedron([Vertex(0, 1, 0), Vertex(1, 1, 0), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri16 = Tetrahedron([Vertex(0, 1, 0), Vertex(0, 1, 1), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
+
+        # (111) (101) (110) (100) --> (0.5 0.5 1)
+        tri17 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 0, 1), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri18 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 1, 0), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri19 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 0, 1), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri20 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 1, 0), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+
+        # (111) (101) (011) (001) --> (0.5 1 0.5)
+        tri21 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 0, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
+        tri22 = Tetrahedron([Vertex(1, 1, 1), Vertex(0, 1, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
+        tri23 = Tetrahedron([Vertex(0, 0, 1), Vertex(1, 0, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
+        tri24 = Tetrahedron([Vertex(0, 0, 1), Vertex(0, 1, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
+
+        tets = [tri1, tri2, tri3, tri4, tri5, tri6, tri7, tri8, tri9, tri10, tri11, tri12, tri13, tri14, tri15,
+                tri16, tri17, tri18, tri19, tri20, tri21, tri22, tri23, tri24]
+
+        for tet in tets:
+            tet.translate(self.pos)
+
+        return tets
 
 
 class QuarTet:
-    def __init__(self, depth):
+    def __init__(self, depth, pos):
         # We start with 3D grid NxNxN and devide each child-cube to 5 tetrahedrons
         # unit cube:
-        self.curr_tetrahedrons = UnitCube().divide()
+        self.curr_tetrahedrons = UnitCube(pos).divide_to_24()
         for _ in range(depth):
             tmp_curr_tetrahedrons = []
             for tet in self.curr_tetrahedrons:
@@ -149,6 +193,18 @@ class QuarTet:
         calculate_and_update_neighborhood(self.curr_tetrahedrons)
         self.fill_neighbors()
 
+    def __init__(self, n):
+        self.curr_tetrahedrons = []
+        for x in range(n):
+            for y in range(n):
+                for z in range(n):
+                    pos = torch.tensor([x, y, z])
+                    tets = UnitCube(pos).divide_to_24()
+                    self.curr_tetrahedrons.extend(tets)
+
+        calculate_and_update_neighborhood(self.curr_tetrahedrons)
+        self.fill_neighbors()
+        
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
             for i in range(4 - len(tet.neighborhood)):
@@ -197,12 +253,3 @@ class QuarTet:
             for _ in points_count[i]:
                 samples.append(sum([vertex * np.random.uniform(0, 1) for vertex in tet.vertices]))
 
-
-if __name__ == '__main__':
-    a = QuarTet(2)
-    for tet in a:
-        print(len(tet.neighborhood))
-    b = a.sample_disjoint_faces(4)
-    c = a.get_occupied_tets()
-    print(b)
-    print(c)
