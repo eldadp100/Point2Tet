@@ -16,7 +16,7 @@ print('device: {}'.format(device))
 
 start_creating_quartet = time.time()
 print("start creating quartet")
-quartet = QuarTet(2, device)
+quartet = QuarTet(1, device)
 print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
 
 # input point cloud
@@ -37,10 +37,11 @@ for i in range(opts.iterations):
     # TODO: Subdivide every opts.upsamp
     print(f"iteration {i} starts")
     iter_start_time = time.time()
-    net(quartet)  # in place changes
+    net(quartet, i)  # in place changes
     loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz)
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
+    quartet.zero_grad()
     # scheduler.step()
     print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")

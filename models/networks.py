@@ -58,18 +58,22 @@ class OurNet(nn.Module):
     def __init__(self):
         super(OurNet, self).__init__()
 
-        ncf = [3, 32, 64, 64]
+        ncf = [32, 64, 64, 32]  # last must be 3 because we iterate
 
+        self.embedding_at_start = MotherCubeConv(3, ncf[0])
         self.conv_net = TetCNN_PP(ncf)  # TetCNN++
-        self.net_vertices_movements = nn.Linear(64, 12)  # 3D movement
-        self.net_occupancy = nn.Linear(64, 1)  # Binary classifier - occupancy
+        self.net_vertices_movements = nn.Linear(ncf[-1], 12)  # 3D movement
+        self.net_occupancy = nn.Linear(ncf[-1], 1)  # Binary classifier - occupancy
 
-    def forward(self, mother_cube):
+    def forward(self, mother_cube, iteration_number):
+        if iteration_number == 0:
+            self.embedding_at_start(mother_cube)
         self.conv_net(mother_cube)
         for tet in mother_cube:
-            tet_deltas = self.net_vertices_movements(tet.features).reshape(4, 3)
+            tet_deltas = self.net_vertices_movements(tet.features).view(4, 3)
             tet.update_by_deltas(tet_deltas)
             tet.occupancy = self.net_occupancy(tet.features).item()
+
 
 
 def reset_params(model):

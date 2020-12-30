@@ -108,7 +108,7 @@ class Vertex:
         self.loc = torch.tensor([x, y, z], dtype=torch.float32)
 
     def update_vertex(self, move_vector):
-        self.loc += move_vector
+        self.loc = self.loc + move_vector
 
     def __hash__(self):
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
@@ -185,6 +185,8 @@ class QuarTet:
             for i in range(4):
                 tet.vertices[i].loc = tet.vertices[i].loc.to(device)
 
+        for tet in self.curr_tetrahedrons:
+            tet.features.requires_grad_()
 
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
@@ -202,6 +204,13 @@ class QuarTet:
             for v in tet.vertices:
                 new_vertices.append(all_vertices[v])
             tet.vertices = new_vertices
+
+    def zero_grad(self):
+        for tet in self.curr_tetrahedrons:
+            tet.features = tet.features.detach().clone()
+            tet.prev_features = tet.prev_features.detach().clone()
+            for i in range(4):
+                tet.vertices[i].loc = tet.vertices[i].loc.detach().clone()
 
     def init_occupancy_with_SDF(self, SDF):
         # TODO: that will improve results
@@ -231,7 +240,7 @@ class QuarTet:
     def get_occupied_tets(self):
         result = []
         for tet in self:
-            if tet.occupancy == 1:
+            if tet.occupancy > 0:
                 result.append(tet)
         return result
 
@@ -241,13 +250,13 @@ class QuarTet:
         volumes = [tet.volume() for tet in occupied_tets]
         volumes_total = sum(volumes)
 
-        points_count = [int(np.round((volume / volumes_total) * pc_size)) for volume in volumes]
+        points_count = [int((volume / volumes_total) * pc_size) for volume in volumes]
 
         for i, tet in enumerate(occupied_tets):
             for _ in range(points_count[i]):
                 samples.append(sum([vertex.loc * np.random.uniform(0, 1) for vertex in tet.vertices]))
 
-        return torch.tensor(samples)
+        return torch.stack(samples)
 
 
 if __name__ == '__main__':
