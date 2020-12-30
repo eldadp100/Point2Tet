@@ -68,7 +68,6 @@ class OurNet(nn.Module):
         self.conv_net(mother_cube)
         for tet in mother_cube:
             tet_deltas = self.net_vertices_movements(tet.features).reshape(4, 3)
-            print(tet_deltas.device)
             tet.update_by_deltas(tet_deltas)
             tet.occupancy = self.net_occupancy(tet.features).item()
 
@@ -103,5 +102,5 @@ if __name__ == '__main__':
     net = OurNet().to(device)
     optimizer = optim.Adam(net.parameters(), lr=0.001)
 
-    a = QuarTet(1)
+    a = QuarTet(1, 'cpu')
     print(net(a))

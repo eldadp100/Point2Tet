@@ -21,7 +21,7 @@ print(f"finished creating quartet - {time.time() - start_creating_quartet} secon
 
 # input point cloud
 # input_xyz, input_normals = utils.read_pts(opts.input_pc)
-# input_xyz = torch.Tensor(input_xyz).type(torch.FloatTensor).to(device)[None, :, :]
+# input_xyz = torch.Tensor(input_xyz).type(torch.FloatTensor).to(device)[None, :, :]  # .type() also changes device somewhy on the server
 # input_normals = torch.Tensor(input_normals).type(torch.FloatTensor).to(device)[None, :, :]
 #
 # # normalize point cloud to [0,1]^3 (Unit Cube)
