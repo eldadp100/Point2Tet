@@ -14,7 +14,10 @@ print('device: {}'.format(device))
 
 # mesh = Mesh(opts.mesh_to_read, device=device, hold_history=True)
 
+start_creating_quartet = time.time()
+print("start creating quartet")
 quartet = QuarTet(2)
+print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
 
 # input point cloud
 # input_xyz, input_normals = utils.read_pts(opts.input_pc)
@@ -27,14 +30,12 @@ quartet = QuarTet(2)
 # input_xyz += 0.5
 # # TODO: add normals normalization
 
-
 input_xyz, input_normals = torch.rand(100, 3), torch.rand(100, 3)
-
 net, optimizer, scheduler = init_net(opts, device)
 
 for i in range(opts.iterations):
     # TODO: Subdivide every opts.upsamp
-
+    print(f"iteration {i} starts")
     iter_start_time = time.time()
     net(quartet)  # in place changes
     loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz)
@@ -42,5 +43,4 @@ for i in range(opts.iterations):
     loss.backward()
     optimizer.step()
     # scheduler.step()
-
-    iter_end_time = time.time()
+    print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
