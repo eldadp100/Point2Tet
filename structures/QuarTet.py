@@ -69,6 +69,7 @@ class Tetrahedron:
 
     def translate(self, vec):
         for vert in self.vertices:
+            print(vert.device)
             vert.update_vertex(vec)
 
 
@@ -163,6 +164,7 @@ class UnitCube:
                 tri16, tri17, tri18, tri19, tri20, tri21, tri22, tri23, tri24]
 
         for tet in tets:
+            print(self.pos.device)
             tet.translate(self.pos)
 
         return tets
