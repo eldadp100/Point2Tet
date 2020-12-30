@@ -104,7 +104,7 @@ class Face:
 
 class Vertex:
     def __init__(self, x, y, z):
-        self.loc = torch.tensor([x, y, z])
+        self.loc = torch.tensor([x, y, z]).type(torch.FloatTensor)
 
     def update_vertex(self, move_vector):
         self.loc += move_vector
