@@ -69,7 +69,6 @@ class Tetrahedron:
 
     def translate(self, vec):
         for vert in self.vertices:
-            print(vert.device)
             vert.update_vertex(vec)
 
 
@@ -111,8 +110,6 @@ class Vertex:
         self.loc = torch.tensor([x, y, z], device=Vertex.device).type(torch.FloatTensor)
 
     def update_vertex(self, move_vector):
-        print(self.loc.device)
-        print(move_vector.device)
         self.loc += move_vector
 
     def __hash__(self):
