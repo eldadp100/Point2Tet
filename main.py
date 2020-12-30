@@ -30,7 +30,7 @@ print(f"finished creating quartet - {time.time() - start_creating_quartet} secon
 # input_xyz += 0.5
 # # TODO: add normals normalization
 
-input_xyz, input_normals = torch.rand(100, 3), torch.rand(100, 3)
+input_xyz, input_normals = torch.rand(100, 3, device=device), torch.rand(100, 3, device=device)
 net, optimizer, scheduler = init_net(opts, device)
 
 for i in range(opts.iterations):
