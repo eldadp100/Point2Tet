@@ -107,6 +107,7 @@ class Vertex:
     device = None
 
     def __init__(self, x, y, z):
+        print(Vertex.device)
         self.loc = torch.tensor([x, y, z], device=Vertex.device).type(torch.FloatTensor)
 
     def update_vertex(self, move_vector):
@@ -161,7 +162,6 @@ class UnitCube:
                 tri16, tri17, tri18, tri19, tri20, tri21, tri22, tri23, tri24]
 
         for tet in tets:
-            print(self.pos.device)
             tet.translate(self.pos)
 
         return tets
