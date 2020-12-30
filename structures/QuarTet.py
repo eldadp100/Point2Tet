@@ -180,7 +180,7 @@ class QuarTet:
 
         for tet in self.curr_tetrahedrons:
             for i in range(4):
-                tet.vertices[i] = tet.vertices[i].to(device)
+                tet.vertices[i] = tet.vertices[i].loc.to(device)
 
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
