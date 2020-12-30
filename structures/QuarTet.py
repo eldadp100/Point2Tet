@@ -177,6 +177,7 @@ class QuarTet:
                 tmp_curr_tetrahedrons += tet.sub_divide()
 
             self.curr_tetrahedrons = tmp_curr_tetrahedrons
+            
         calculate_and_update_neighborhood(self.curr_tetrahedrons)
         self.fill_neighbors()
         self.merge_same_vertices()
@@ -192,6 +193,7 @@ class QuarTet:
 
         calculate_and_update_neighborhood(self.curr_tetrahedrons)
         self.fill_neighbors()
+        self.merge_same_vertices()
         
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
