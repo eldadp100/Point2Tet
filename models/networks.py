@@ -17,9 +17,11 @@ class MotherCubeConv(nn.Module):
         for tet in mother_cube:
             neighborhood_features = [tet.features]
             for n_tet in tet.neighborhood:
-                neighborhood_features.append(n_tet.features)
+                neighborhood_features.append(n_tet.prev_features)
             neighborhood_features = torch.cat(neighborhood_features, dim=0)
             tet.features = self.lin(neighborhood_features)
+        for tet in mother_cube:
+            tet.prev_features = tet.features
 
 
 class MotherCubePool(nn.Module):
@@ -48,8 +50,8 @@ class TetCNN_PP(nn.Module):
             # setattr(self, f'pool{i}', MotherCubePool(num_features, ))
 
     def forward(self, mother_cube):
-        for i in range(len(self.ncf)):
-            mother_cube = getattr(self, f'conv{i}')(mother_cube)
+        for i in range(len(self.ncf) - 1):
+            getattr(self, f'conv{i}')(mother_cube)
 
 
 class OurNet(nn.Module):
@@ -93,3 +95,12 @@ def init_net(opts, device):
     scheduler = get_scheduler(opts.iterations, optimizer)
 
     return net, optimizer, scheduler
+
+
+if __name__ == '__main__':
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    net = OurNet().to(device)
+    optimizer = optim.Adam(net.parameters(), lr=0.001)
+
+    a = QuarTet(1)
+    print(net(a))
