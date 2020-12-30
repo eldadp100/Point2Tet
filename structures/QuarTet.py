@@ -107,7 +107,7 @@ class Vertex:
     device = None
 
     def __init__(self, x, y, z):
-        self.loc = torch.tensor([x, y, z], device=Vertex.device).type(torch.FloatTensor)
+        self.loc = torch.tensor([x, y, z], device=Vertex.device, dtype=torch.FloatTensor)
         print(self.loc.device)
 
     def update_vertex(self, move_vector):
