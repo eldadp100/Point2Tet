@@ -117,7 +117,18 @@ class Face:
         return self.tet1, self.tet2
 
 
-def Vertex(x, y, z):
+class Vertex:
+    def __init__(self, x, y, z):
+        self.loc = torch.tensor([x, y, z])
+
+    def update_vertex(self, move_vector):
+        self.loc += move_vector
+
+    def __hash__(self):
+        return self.loc.__hash__()
+
+
+def create_vertex(x, y, z):
     return torch.tensor([x, y, z])
 
 
@@ -126,60 +137,95 @@ class UnitCube:
         pass
 
     def divide_to_five(self):
-        tri1 = Tetrahedron([Vertex(0, 1, 0), Vertex(0, 1, 1), Vertex(1, 1, 1), Vertex(0, 0, 1)])
-        tri2 = Tetrahedron([Vertex(0, 1, 0), Vertex(1, 1, 1), Vertex(0, 0, 1), Vertex(1, 0, 0)])
-        tri3 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0, 0, 1), Vertex(0, 1, 0)])
-        tri4 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 0, 1), Vertex(0, 0, 1), Vertex(1, 1, 1)])
-        tri5 = Tetrahedron([Vertex(0, 1, 0), Vertex(1, 0, 0), Vertex(1, 1, 1), Vertex(1, 1, 0)])
+        tri1 = Tetrahedron(
+            [create_vertex(0, 1, 0), create_vertex(0, 1, 1), create_vertex(1, 1, 1), create_vertex(0, 0, 1)])
+        tri2 = Tetrahedron(
+            [create_vertex(0, 1, 0), create_vertex(1, 1, 1), create_vertex(0, 0, 1), create_vertex(1, 0, 0)])
+        tri3 = Tetrahedron(
+            [create_vertex(0, 0, 0), create_vertex(1, 0, 0), create_vertex(0, 0, 1), create_vertex(0, 1, 0)])
+        tri4 = Tetrahedron(
+            [create_vertex(1, 0, 0), create_vertex(1, 0, 1), create_vertex(0, 0, 1), create_vertex(1, 1, 1)])
+        tri5 = Tetrahedron(
+            [create_vertex(0, 1, 0), create_vertex(1, 0, 0), create_vertex(1, 1, 1), create_vertex(1, 1, 0)])
 
         return [tri1, tri2, tri3, tri4, tri5]
 
     def divide_to_six(self):
-        tri1 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 1, 0), Vertex(0, 1, 0), Vertex(0, 1, 1)])
-        tri2 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0, 1, 1), Vertex(0, 1, 0)])
-        tri3 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0, 0, 1), Vertex(0, 1, 1)])
-        tri4 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 0, 1), Vertex(0, 0, 1), Vertex(0, 1, 1)])
-        tri5 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 1, 1), Vertex(0, 1, 1), Vertex(1, 1, 0)])
-        tri6 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 0, 1), Vertex(1, 1, 1), Vertex(0, 1, 1)])
+        tri1 = Tetrahedron(
+            [create_vertex(1, 0, 0), create_vertex(1, 1, 0), create_vertex(0, 1, 0), create_vertex(0, 1, 1)])
+        tri2 = Tetrahedron(
+            [create_vertex(0, 0, 0), create_vertex(1, 0, 0), create_vertex(0, 1, 1), create_vertex(0, 1, 0)])
+        tri3 = Tetrahedron(
+            [create_vertex(0, 0, 0), create_vertex(1, 0, 0), create_vertex(0, 0, 1), create_vertex(0, 1, 1)])
+        tri4 = Tetrahedron(
+            [create_vertex(1, 0, 0), create_vertex(1, 0, 1), create_vertex(0, 0, 1), create_vertex(0, 1, 1)])
+        tri5 = Tetrahedron(
+            [create_vertex(1, 0, 0), create_vertex(1, 1, 1), create_vertex(0, 1, 1), create_vertex(1, 1, 0)])
+        tri6 = Tetrahedron(
+            [create_vertex(1, 0, 0), create_vertex(1, 0, 1), create_vertex(1, 1, 1), create_vertex(0, 1, 1)])
 
         return [tri1, tri2, tri3, tri4, tri5, tri6]
 
     def divide_to_24(self):
         # (000) (010) (001) (011) --> (0 0.5 0.5)
-        tri1 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 1, 0), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri2 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 0, 1), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri3 = Tetrahedron([Vertex(0, 1, 1), Vertex(0, 1, 0), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri4 = Tetrahedron([Vertex(0, 1, 1), Vertex(0, 0, 1), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri1 = Tetrahedron(
+            [create_vertex(0, 0, 0), create_vertex(0, 1, 0), create_vertex(0, 0.5, 0.5), create_vertex(0.5, 0.5, 0.5)])
+        tri2 = Tetrahedron(
+            [create_vertex(0, 0, 0), create_vertex(0, 0, 1), create_vertex(0, 0.5, 0.5), create_vertex(0.5, 0.5, 0.5)])
+        tri3 = Tetrahedron(
+            [create_vertex(0, 1, 1), create_vertex(0, 1, 0), create_vertex(0, 0.5, 0.5), create_vertex(0.5, 0.5, 0.5)])
+        tri4 = Tetrahedron(
+            [create_vertex(0, 1, 1), create_vertex(0, 0, 1), create_vertex(0, 0.5, 0.5), create_vertex(0.5, 0.5, 0.5)])
 
         # (000) (100) (010) (110) --> (0.5 0.5 0)
-        tri5 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
-        tri6 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 1, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
-        tri7 = Tetrahedron([Vertex(1, 1, 0), Vertex(1, 0, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
-        tri8 = Tetrahedron([Vertex(1, 1, 0), Vertex(0, 1, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
+        tri5 = Tetrahedron(
+            [create_vertex(0, 0, 0), create_vertex(1, 0, 0), create_vertex(0.5, 0.5, 0), create_vertex(0.5, 0.5, 0.5)])
+        tri6 = Tetrahedron(
+            [create_vertex(0, 0, 0), create_vertex(0, 1, 0), create_vertex(0.5, 0.5, 0), create_vertex(0.5, 0.5, 0.5)])
+        tri7 = Tetrahedron(
+            [create_vertex(1, 1, 0), create_vertex(1, 0, 0), create_vertex(0.5, 0.5, 0), create_vertex(0.5, 0.5, 0.5)])
+        tri8 = Tetrahedron(
+            [create_vertex(1, 1, 0), create_vertex(0, 1, 0), create_vertex(0.5, 0.5, 0), create_vertex(0.5, 0.5, 0.5)])
 
         # (000) (100) (001) (101) --> (0.5 0 0.5)
-        tri9 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri10 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 0, 1), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri11 = Tetrahedron([Vertex(1, 0, 1), Vertex(1, 0, 0), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri12 = Tetrahedron([Vertex(1, 0, 1), Vertex(0, 0, 1), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri9 = Tetrahedron(
+            [create_vertex(0, 0, 0), create_vertex(1, 0, 0), create_vertex(0.5, 0, 0.5), create_vertex(0.5, 0.5, 0.5)])
+        tri10 = Tetrahedron(
+            [create_vertex(0, 0, 0), create_vertex(0, 0, 1), create_vertex(0.5, 0, 0.5), create_vertex(0.5, 0.5, 0.5)])
+        tri11 = Tetrahedron(
+            [create_vertex(1, 0, 1), create_vertex(1, 0, 0), create_vertex(0.5, 0, 0.5), create_vertex(0.5, 0.5, 0.5)])
+        tri12 = Tetrahedron(
+            [create_vertex(1, 0, 1), create_vertex(0, 0, 1), create_vertex(0.5, 0, 0.5), create_vertex(0.5, 0.5, 0.5)])
 
         # (111) (011) (110) (010) --> (1 0.5 0.5)
-        tri13 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 1, 0), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri14 = Tetrahedron([Vertex(1, 1, 1), Vertex(0, 1, 1), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri15 = Tetrahedron([Vertex(0, 1, 0), Vertex(1, 1, 0), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri16 = Tetrahedron([Vertex(0, 1, 0), Vertex(0, 1, 1), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri13 = Tetrahedron(
+            [create_vertex(1, 1, 1), create_vertex(1, 1, 0), create_vertex(0.5, 1, 0.5), create_vertex(0.5, 0.5, 0.5)])
+        tri14 = Tetrahedron(
+            [create_vertex(1, 1, 1), create_vertex(0, 1, 1), create_vertex(0.5, 1, 0.5), create_vertex(0.5, 0.5, 0.5)])
+        tri15 = Tetrahedron(
+            [create_vertex(0, 1, 0), create_vertex(1, 1, 0), create_vertex(0.5, 1, 0.5), create_vertex(0.5, 0.5, 0.5)])
+        tri16 = Tetrahedron(
+            [create_vertex(0, 1, 0), create_vertex(0, 1, 1), create_vertex(0.5, 1, 0.5), create_vertex(0.5, 0.5, 0.5)])
 
         # (111) (101) (110) (100) --> (0.5 0.5 1)
-        tri17 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 0, 1), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri18 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 1, 0), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri19 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 0, 1), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri20 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 1, 0), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+        tri17 = Tetrahedron(
+            [create_vertex(1, 1, 1), create_vertex(1, 0, 1), create_vertex(1, 0.5, 0.5), create_vertex(0.5, 0.5, 0.5)])
+        tri18 = Tetrahedron(
+            [create_vertex(1, 1, 1), create_vertex(1, 1, 0), create_vertex(1, 0.5, 0.5), create_vertex(0.5, 0.5, 0.5)])
+        tri19 = Tetrahedron(
+            [create_vertex(1, 0, 0), create_vertex(1, 0, 1), create_vertex(1, 0.5, 0.5), create_vertex(0.5, 0.5, 0.5)])
+        tri20 = Tetrahedron(
+            [create_vertex(1, 0, 0), create_vertex(1, 1, 0), create_vertex(1, 0.5, 0.5), create_vertex(0.5, 0.5, 0.5)])
 
         # (111) (101) (011) (001) --> (0.5 1 0.5)
-        tri21 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 0, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
-        tri22 = Tetrahedron([Vertex(1, 1, 1), Vertex(0, 1, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
-        tri23 = Tetrahedron([Vertex(0, 0, 1), Vertex(1, 0, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
-        tri24 = Tetrahedron([Vertex(0, 0, 1), Vertex(0, 1, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
+        tri21 = Tetrahedron(
+            [create_vertex(1, 1, 1), create_vertex(1, 0, 1), create_vertex(0.5, 0.5, 1), create_vertex(0.5, 0.5, 0.5)])
+        tri22 = Tetrahedron(
+            [create_vertex(1, 1, 1), create_vertex(0, 1, 1), create_vertex(0.5, 0.5, 1), create_vertex(0.5, 0.5, 0.5)])
+        tri23 = Tetrahedron(
+            [create_vertex(0, 0, 1), create_vertex(1, 0, 1), create_vertex(0.5, 0.5, 1), create_vertex(0.5, 0.5, 0.5)])
+        tri24 = Tetrahedron(
+            [create_vertex(0, 0, 1), create_vertex(0, 1, 1), create_vertex(0.5, 0.5, 1), create_vertex(0.5, 0.5, 0.5)])
 
         return [tri1, tri2, tri3, tri4, tri5, tri6, tri7, tri8, tri9, tri10, tri11, tri12, tri13, tri14, tri15,
                 tri16, tri17, tri18, tri19, tri20, tri21, tri22, tri23, tri24]
@@ -201,11 +247,24 @@ class QuarTet:
             self.curr_tetrahedrons = tmp_curr_tetrahedrons
         calculate_and_update_neighborhood(self.curr_tetrahedrons)
         self.fill_neighbors()
+        self.merge_same_vertices()
 
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
             for i in range(4 - len(tet.neighborhood)):
                 tet.add_neighbor(tet)
+
+    def merge_same_vertices(self):
+        all_vertices = {}
+        for tet in self.curr_tetrahedrons:
+            for v in tet.vertices:
+                all_vertices[v] = v
+
+        for tet in self.curr_tetrahedrons:
+            new_vertices = []
+            for v in tet.vertices:
+                new_vertices.append(all_vertices[v])
+            tet.vertices = new_vertices
 
     def init_occupancy_with_SDF(self, SDF):
         # TODO: that will improve results
