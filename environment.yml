@@ -1,4 +1,4 @@
-name: point2mesh
+name: point2tet
 channels:
   - pytorch
   - defaults
