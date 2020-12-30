@@ -13,7 +13,6 @@ class MotherCubeConv(nn.Module):
         super(MotherCubeConv, self).__init__()
         self.lin = nn.Linear(NEIGHBORHOOD_SIZE * in_features, out_features)
 
-
     def forward(self, mother_cube: QuarTet):
         for tet in mother_cube:
             neighborhood_features = [tet.features]
@@ -43,6 +42,7 @@ class MotherCubePool(nn.Module):
 class TetCNN_PP(nn.Module):
     def __init__(self, ncf):
         super(TetCNN_PP, self).__init__()
+        self.ncf = ncf
         for i, num_features in enumerate(ncf[:-1]):
             setattr(self, f'conv{i}', MotherCubeConv(num_features, ncf[i + 1]))
             # setattr(self, f'pool{i}', MotherCubePool(num_features, ))
@@ -50,7 +50,6 @@ class TetCNN_PP(nn.Module):
     def forward(self, mother_cube):
         for i in range(len(self.ncf)):
             mother_cube = getattr(self, f'conv{i}')(mother_cube)
-
 
 
 class OurNet(nn.Module):
@@ -94,4 +93,3 @@ def init_net(opts, device):
     scheduler = get_scheduler(opts.iterations, optimizer)
 
     return net, optimizer, scheduler
-
