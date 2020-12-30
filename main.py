@@ -16,7 +16,7 @@ print('device: {}'.format(device))
 
 start_creating_quartet = time.time()
 print("start creating quartet")
-quartet = QuarTet(2)
+quartet = QuarTet(2, device)
 print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
 
 # input point cloud

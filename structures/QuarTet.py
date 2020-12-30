@@ -104,15 +104,16 @@ class Face:
 
 
 class Vertex:
+    device = None
+
     def __init__(self, x, y, z):
-        self.loc = torch.tensor([x, y, z]).type(torch.FloatTensor)
+        self.loc = torch.tensor([x, y, z], device=Vertex.device).type(torch.FloatTensor)
 
     def update_vertex(self, move_vector):
         self.loc += move_vector
 
     def __hash__(self):
         return self.loc.__hash__()
-
 
 
 class UnitCube:
@@ -166,19 +167,20 @@ class UnitCube:
 
 
 class QuarTet:
-    def __init__(self, n):
+    def __init__(self, n, device):
+        Vertex.device = device  # TODO: get rid of this line
         self.curr_tetrahedrons = []
         for x in range(n):
             for y in range(n):
                 for z in range(n):
-                    pos = torch.tensor([x, y, z])
+                    pos = torch.tensor([x, y, z], device=device)
                     tets = UnitCube(pos).divide_to_24()
                     self.curr_tetrahedrons.extend(tets)
 
         calculate_and_update_neighborhood(self.curr_tetrahedrons)
         self.fill_neighbors()
         self.merge_same_vertices()
-        
+
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
             for i in range(4 - len(tet.neighborhood)):
