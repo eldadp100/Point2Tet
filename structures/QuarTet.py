@@ -166,7 +166,7 @@ class UnitCube:
 
 
 class QuarTet:
-    def __init__(self, n, device):
+    def __init__(self, n, device="cpu"):
         self.curr_tetrahedrons = []
         for x in range(n):
             for y in range(n):
