@@ -9,7 +9,7 @@ from structures.QuarTet import QuarTet
 options = Options()
 opts = options.args
 torch.manual_seed(opts.torch_seed)
-device = torch.device('cuda:{}'.format(opts.gpu) if torch.cuda.is_available() else torch.device('cpu'))
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('device: {}'.format(device))
 
 # mesh = Mesh(opts.mesh_to_read, device=device, hold_history=True)
