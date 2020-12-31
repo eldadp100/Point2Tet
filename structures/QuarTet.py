@@ -261,7 +261,54 @@ class QuarTet:
         return torch.stack(samples)
 
     def export(self, path):
-        pass
+        with open(path, "w") as output_file:
+            vertex_to_idx = {}
+            i = 0
+            for tet in self.curr_tetrahedrons:
+                for v in tet.vertices:
+                    if v not in vertex_to_idx:
+                        x, y, z = v.loc
+                        output_file.write(f"v {x} {y} {z}\n")
+                        vertex_to_idx[v] = i
+                        i += 1
+
+            for tet in self.curr_tetrahedrons:
+                indices = [vertex_to_idx[v] for v in tet.vertices]
+                output_file.write(f"f {indices[0]} {indices[1]} {indices[2]} {indices[3]}\n")
+
+    def load(self, path, device):
+        self.curr_tetrahedrons = []
+        with open(path, "r") as input_file:
+            vertices = []
+            while True:
+                line = next(input_file)
+                if line[0] == 'f':
+                    break
+                coordinates = line.split(' ')
+                vertices.append(Vertex(*[float(c) for c in coordinates[1:]]))
+
+            try:
+                while True:
+                    line = next(input_file)
+                    vertex_indices = line.split(' ')
+                    self.curr_tetrahedrons.append(Tetrahedron([vertices[int(i)] for i in vertex_indices[1:]]))
+            except StopIteration:
+                pass
+
+        calculate_and_update_neighborhood(self.curr_tetrahedrons)
+        self.fill_neighbors()
+        self.merge_same_vertices()
+
+        for tet in self.curr_tetrahedrons:
+            tet.occupancy = tet.occupancy.to(device)
+            tet.features = tet.features.to(device)
+            tet.prev_features = tet.prev_features.to(device)
+            for i in range(4):
+                tet.vertices[i].loc = tet.vertices[i].loc.to(device)
+
+        for tet in self.curr_tetrahedrons:
+            tet.features.requires_grad_()
+
 
     def create_mesh(self):
         faces = list()
@@ -278,9 +325,13 @@ class QuarTet:
 
 
 if __name__ == '__main__':
+    # a = QuarTet(2, 'cpu')
     a = QuarTet(2, 'cpu')
+    a.load("mother_cube.obj", "cpu")
     for tet in a:
         print(len(tet.neighborhood))
+    # a.export("mother_cube.obj")
+
     b = a.sample_disjoint_faces(4)
     c = a.get_occupied_tets()
     d = a.sample_point_cloud(100)
