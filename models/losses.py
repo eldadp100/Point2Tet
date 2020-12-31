@@ -12,3 +12,9 @@ def chamfer_distance_quartet_to_point_cloud(quartet, pc, quartet_N_points=3000):
 #
 # def chamfer_distance_quartet_to_point_cloud(quartet, pc, quartet_N_points=3000):
 #     return quartet.sample_point_cloud(quartet_N_points).abs().sum()
+
+
+if __name__ == '__main__':
+    a = torch.rand((1000, 3))
+    b = torch.rand((1400, 3))
+    chamfer_distance_quartet_to_point_cloud(a, b)

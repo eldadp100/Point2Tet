@@ -36,7 +36,7 @@ input_normals += 0.5
 
 
 net, optimizer, scheduler = init_net(opts, device)
-
+evaluate_every_k_iterations = 500
 for i in range(opts.iterations):
     # TODO: Subdivide every opts.upsamp
     print(f"iteration {i} starts")
@@ -50,3 +50,16 @@ for i in range(opts.iterations):
     print(loss)
     # scheduler.step()
     print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
+
+    if i != 0 and i % evaluate_every_k_iterations == 0:
+        checkpoint_file_path = f"./checkpoints/{opts.name}/model_checkpoint_{i}.pt"
+        quartet_file_path = f"./checkpoints/{opts.name}/quartet_{i}"
+        mesh_file_path = f"./checkpoints/{opts.name}/mesh_{i}"
+
+        state_dict = {
+            "net": net.state_dict(),
+            "optim": optimizer.state_dict()
+        }
+
+        quartet.export(quartet_file_path)
+        quartet.export_mesh(mesh_file_path)

@@ -183,6 +183,7 @@ class QuarTet:
         self.merge_same_vertices()
 
         for tet in self.curr_tetrahedrons:
+            tet.occupancy = tet.occupancy.to(device)
             tet.features = tet.features.to(device)
             tet.prev_features = tet.prev_features.to(device)
             for i in range(4):
@@ -260,6 +261,22 @@ class QuarTet:
                 samples.append(sum([vertex.loc * np.random.uniform(0, 1) for vertex in tet.vertices]))
 
         return torch.stack(samples)
+
+    def export(self, path):
+        pass
+
+    def create_mesh(self):
+        faces = list()
+        for tet in self.curr_tetrahedrons:
+            for nei in tet.neighborhood:
+                if tet == nei:
+                    continue
+                if (tet.occupancy > 0.5) ^ (nei.occupancy > 0.5):
+                    face = Face(tet, nei)
+                    faces.append(face)
+
+    def export_mesh(self, path):
+        pass
 
 
 if __name__ == '__main__':
