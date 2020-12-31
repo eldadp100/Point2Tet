@@ -59,10 +59,10 @@ class Tetrahedron:
     def volume(self):
         p1, p2, p3, p4 = [v.loc for v in self.vertices]
         return (abs(self.determinant_3x3((
-                                    self.subtract(p1, p2),
-                                    self.subtract(p2, p3),
-                                    self.subtract(p3, p4),
-                                    ))) / 6.0)
+            self.subtract(p1, p2),
+            self.subtract(p2, p3),
+            self.subtract(p3, p4),
+        ))) / 6.0)
 
     def translate(self, vec):
         for vert in self.vertices:
@@ -109,6 +109,10 @@ class Vertex:
 
     def update_vertex(self, move_vector):
         self.loc = self.loc + move_vector
+
+    def get_xyz(self):
+        x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
+        return (x, y, z)
 
     def __hash__(self):
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
@@ -272,9 +276,26 @@ class QuarTet:
                 if (tet.occupancy > 0.5) ^ (nei.occupancy > 0.5):
                     face = Face(tet, nei)
                     faces.append(face)
+        return faces
 
     def export_mesh(self, path):
-        pass
+        faces = self.create_mesh()
+        obj_file_str_vert = []
+        obj_file_str_faces = []
+        vertices = {}
+        c = 1
+        for i, f in enumerate(faces):
+            f_coords = f.face_coords
+            for v in f_coords:
+                x, y, z = v.get_xyz()
+                if (x, y, z) not in vertices:
+                    vertices[(x, y, z)] = c
+                    c += 1
+                obj_file_str_vert.append(f"v {x} {y} {z}\n")
+            obj_file_str_faces.append(f"f {vertices[f_coords[0].get_xyz()]} {vertices[f_coords[1].get_xyz()]} {vertices[f_coords[2].get_xyz()]}\n")
+        with open(path, 'w+') as f:
+            f.write("\n".join(obj_file_str_vert))
+            f.write("\n".join(obj_file_str_faces))
 
 
 if __name__ == '__main__':
@@ -287,3 +308,5 @@ if __name__ == '__main__':
     print(b)
     print(c)
     print(d)
+
+    a.export_mesh('try.obj')
