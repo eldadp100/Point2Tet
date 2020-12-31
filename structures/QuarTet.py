@@ -11,7 +11,8 @@ class Tetrahedron:
         self.vertices = vertices
         self.occupancy = np.random.choice([0, 1])  # very small chance to all be 0
         self.neighborhood = set()
-        self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum() / 4
+        self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4.
+        self.prev_features = self.features
         self.sub_divided = None
         self.pooled = False
         self.depth = depth
@@ -32,8 +33,8 @@ class Tetrahedron:
 
     def get_center(self):
         a = torch.stack([v.loc for v in self.vertices])
-        loc = a.permute(1, 0).sum(dim=1) / 4
-        return loc
+        loc = a.permute(1, 0).sum(dim=1) / 4.
+        return Vertex(loc[0], loc[1], loc[2])
 
     def __hash__(self):
         return (self.vertices[0], self.vertices[1], self.vertices[2], self.vertices[3]).__hash__()
@@ -65,6 +66,10 @@ class Tetrahedron:
 
     def volume(self):
         return Tetrahedron.determinant([v.loc for v in self.vertices]) / 6
+
+    def translate(self, vec):
+        for vert in self.vertices:
+            vert.update_vertex(vec)
 
 
 def calculate_and_update_neighborhood(list_of_tetrahedrons):
@@ -100,18 +105,19 @@ class Face:
 
 class Vertex:
     def __init__(self, x, y, z):
-        self.loc = torch.tensor([x, y, z])
+        self.loc = torch.tensor([x, y, z], dtype=torch.float32)
 
     def update_vertex(self, move_vector):
-        self.loc += move_vector
+        self.loc = self.loc + move_vector
 
     def __hash__(self):
-        return self.loc.__hash__()
+        x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
+        return (x, y, z).__hash__()
 
 
 class UnitCube:
-    def __init__(self):
-        pass
+    def __init__(self, pos):
+        self.pos = pos
 
     def divide_to_24(self):
         # (000) (010) (001) (011) --> (0 0.5 0.5)
@@ -150,21 +156,37 @@ class UnitCube:
         tri23 = Tetrahedron([Vertex(0, 0, 1), Vertex(1, 0, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
         tri24 = Tetrahedron([Vertex(0, 0, 1), Vertex(0, 1, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
 
-        return [tri1, tri2, tri3, tri4, tri5, tri6, tri7, tri8, tri9, tri10, tri11, tri12, tri13, tri14, tri15,
+        tets = [tri1, tri2, tri3, tri4, tri5, tri6, tri7, tri8, tri9, tri10, tri11, tri12, tri13, tri14, tri15,
                 tri16, tri17, tri18, tri19, tri20, tri21, tri22, tri23, tri24]
 
-    def divide(self):
-        return self.divide_to_24()
+        for tet in tets:
+            tet.translate(self.pos)
+
+        return tets
 
 
 class QuarTet:
-    def __init__(self, depth):
-        # We start with 3D grid NxNxN and devide each child-cube to 5 tetrahedrons
-        # unit cube:
-        self.curr_tetrahedrons = UnitCube().divide()
+    def __init__(self, n, device):
+        self.curr_tetrahedrons = []
+        for x in range(n):
+            for y in range(n):
+                for z in range(n):
+                    pos = torch.tensor([x, y, z])
+                    tets = UnitCube(pos).divide_to_24()
+                    self.curr_tetrahedrons.extend(tets)
+
         calculate_and_update_neighborhood(self.curr_tetrahedrons)
         self.fill_neighbors()
         self.merge_same_vertices()
+
+        for tet in self.curr_tetrahedrons:
+            tet.features = tet.features.to(device)
+            tet.prev_features = tet.prev_features.to(device)
+            for i in range(4):
+                tet.vertices[i].loc = tet.vertices[i].loc.to(device)
+
+        for tet in self.curr_tetrahedrons:
+            tet.features.requires_grad_()
 
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
@@ -182,6 +204,13 @@ class QuarTet:
             for v in tet.vertices:
                 new_vertices.append(all_vertices[v])
             tet.vertices = new_vertices
+
+    def zero_grad(self):
+        for tet in self.curr_tetrahedrons:
+            tet.features = tet.features.detach().clone()
+            tet.prev_features = tet.prev_features.detach().clone()
+            for i in range(4):
+                tet.vertices[i].loc = tet.vertices[i].loc.detach().clone()
 
     def init_occupancy_with_SDF(self, SDF):
         # TODO: that will improve results
@@ -211,7 +240,7 @@ class QuarTet:
     def get_occupied_tets(self):
         result = []
         for tet in self:
-            if tet.occupancy == 1:
+            if tet.occupancy > 0:
                 result.append(tet)
         return result
 
@@ -221,17 +250,17 @@ class QuarTet:
         volumes = [tet.volume() for tet in occupied_tets]
         volumes_total = sum(volumes)
 
-        points_count = [int(np.round((volume / volumes_total) * pc_size)) for volume in volumes]
+        points_count = [int((volume / volumes_total) * pc_size) for volume in volumes]
 
         for i, tet in enumerate(occupied_tets):
             for _ in range(points_count[i]):
                 samples.append(sum([vertex.loc * np.random.uniform(0, 1) for vertex in tet.vertices]))
 
-        return samples
+        return torch.stack(samples)
 
 
 if __name__ == '__main__':
-    a = QuarTet(2)
+    a = QuarTet(2, 'cpu')
     for tet in a:
         print(len(tet.neighborhood))
     b = a.sample_disjoint_faces(4)
