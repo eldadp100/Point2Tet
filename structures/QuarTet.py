@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import random
 
 
 def tensors_eq(v1, v2):
@@ -44,28 +45,24 @@ class Tetrahedron:
             v.update_vertex(vertices_deltas[i])
 
     @staticmethod
-    def determinant(mat):
-        a = mat[0][0]
-        b = mat[0][1]
-        c = mat[0][2]
-        d = mat[1][0]
-        e = mat[1][1]
-        f = mat[1][2]
-        g = mat[2][0]
-        h = mat[2][1]
-        i = mat[2][2]
+    def determinant_3x3(m):
+        return (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
+                m[1][0] * (m[0][1] * m[2][2] - m[0][2] * m[2][1]) +
+                m[2][0] * (m[0][1] * m[1][2] - m[0][2] * m[1][1]))
 
-        return (
-                a * e * i +
-                b * f * g +
-                c * d * h -
-                c * e * g -
-                b * d * i -
-                a * f * h
-        )
+    @staticmethod
+    def subtract(a, b):
+        return (a[0] - b[0],
+                a[1] - b[1],
+                a[2] - b[2])
 
     def volume(self):
-        return Tetrahedron.determinant([v.loc for v in self.vertices]) / 6
+        p1, p2, p3, p4 = [v.loc for v in self.vertices]
+        return (abs(self.determinant_3x3((
+                                    self.subtract(p1, p2),
+                                    self.subtract(p2, p3),
+                                    self.subtract(p3, p4),
+                                    ))) / 6.0)
 
     def translate(self, vec):
         for vert in self.vertices:
@@ -169,7 +166,7 @@ class UnitCube:
 
 
 class QuarTet:
-    def __init__(self, n, device):
+    def __init__(self, n, device="cpu"):
         self.curr_tetrahedrons = []
         for x in range(n):
             for y in range(n):
@@ -254,12 +251,13 @@ class QuarTet:
         volumes = [tet.volume() * tet.get_diff_occupancy() for tet in occupied_tets]
         volumes_total = sum(volumes)
 
-        points_count = [int((volume / volumes_total) * pc_size) for volume in volumes]
+        points_count = [np.int(np.ceil(((volume / volumes_total) * pc_size).item())) for volume in volumes]
 
         for i, tet in enumerate(occupied_tets):
             for _ in range(points_count[i]):
                 samples.append(sum([vertex.loc * np.random.uniform(0, 1) for vertex in tet.vertices]))
 
+        samples = random.choices(samples, k=pc_size)
         return torch.stack(samples)
 
     def export(self, path):
