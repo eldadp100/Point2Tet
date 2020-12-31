@@ -15,4 +15,3 @@ dependencies:
   - pip
   - pip:
     - pytest==5.4.2
-    - chamferdist
