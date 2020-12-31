@@ -12,9 +12,10 @@ def read_pts(pts_file):
     xyz, normals = [], []
     with open(pts_file, 'r') as f:
         # line = f.readline()
-        spt = f.read().split('\n')
+        # spt = f.read().split('\n')
         # while line:
-        for line in spt:
+        # for line in spt:
+        for line in f:
             parts = line.strip().split(' ')
             try:
                 x = np.array(parts, dtype=np.float32)
