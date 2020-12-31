@@ -8,7 +8,19 @@ def chamfer_dist(src_pc, dst_pc):
     dist_forward = chamferDist(src_pc, dst_pc)
     return dist_forward.detach().cpu().item()
 
-def chamfer_dist_quartet_to_pc(quartet, pc, quartet_sample_count=3000):
-    src_pc = quartet.sample_point_cloud(quartet_sample_count)
-    dst_pc = pc.points
-    return chamfer_dist(src_pc.unsqueeze(1), dst_pc.unsqueeze(1))
+def chamfer_distance_quartet_to_point_cloud(quartet, pc, quartet_N_points=3000):
+    quartet_pc = quartet.sample_point_cloud(quartet_N_points)
+    return chamfer_distance(quartet_pc.unsqueeze(1), pc.unsqueeze(1))
+
+# # PUT IN COMMENT BEFORE PUSH TO GIT
+# import torch
+#
+#
+# def chamfer_distance_quartet_to_point_cloud(quartet, pc, quartet_N_points=3000):
+#     return quartet.sample_point_cloud(quartet_N_points).abs().sum()
+
+
+if __name__ == '__main__':
+    a = torch.rand((1000, 3))
+    b = torch.rand((1400, 3))
+    chamfer_distance_quartet_to_point_cloud(a, b)
