@@ -9,7 +9,7 @@ def tensors_eq(v1, v2):
 class Tetrahedron:
     def __init__(self, vertices, depth=0):
         self.vertices = vertices
-        self.occupancy = np.random.choice([0, 1])  # very small chance to all be 0
+        self.occupancy = torch.rand(1)  # very small chance to all be 0
         self.neighborhood = set()
         self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4.
         self.prev_features = self.features
@@ -70,6 +70,9 @@ class Tetrahedron:
     def translate(self, vec):
         for vert in self.vertices:
             vert.update_vertex(vec)
+
+    def get_diff_occupancy(self):
+        return self.occupancy + 0.05
 
 
 def calculate_and_update_neighborhood(list_of_tetrahedrons):
@@ -247,7 +250,7 @@ class QuarTet:
     def sample_point_cloud(self, pc_size):
         samples = []
         occupied_tets = self.get_occupied_tets()
-        volumes = [tet.volume() for tet in occupied_tets]
+        volumes = [tet.volume() * tet.get_diff_occupancy() for tet in occupied_tets]
         volumes_total = sum(volumes)
 
         points_count = [int((volume / volumes_total) * pc_size) for volume in volumes]

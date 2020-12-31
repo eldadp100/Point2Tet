@@ -4,6 +4,7 @@ from torch import optim
 import numpy as np
 
 from structures.QuarTet import QuarTet, Tetrahedron
+import torch.nn.functional as F
 
 NEIGHBORHOOD_SIZE = 5
 
@@ -72,8 +73,7 @@ class OurNet(nn.Module):
         for tet in mother_cube:
             tet_deltas = self.net_vertices_movements(tet.features).view(4, 3)
             tet.update_by_deltas(tet_deltas)
-            tet.occupancy = self.net_occupancy(tet.features).item()
-
+            tet.occupancy = torch.sigmoid(self.net_occupancy(tet.features))
 
 
 def reset_params(model):
@@ -107,4 +107,4 @@ if __name__ == '__main__':
     optimizer = optim.Adam(net.parameters(), lr=0.001)
 
     a = QuarTet(1, 'cpu')
-    print(net(a))
+    print(net(a, 0))
