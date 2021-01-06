@@ -13,10 +13,12 @@ class Tetrahedron:
         self.occupancy = torch.rand(1)  # very small chance to all be 0
         self.neighborhood = set()
         self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4.
+        # self.features = torch.tensor([1.,1.,1.])
         self.prev_features = self.features
         self.sub_divided = None
         self.pooled = False
         self.depth = depth
+        self.last_move = None
 
     def add_neighbor(self, neighbor):
         self.neighborhood.add(neighbor)
@@ -38,11 +40,21 @@ class Tetrahedron:
         return Vertex(loc[0], loc[1], loc[2])
 
     def __hash__(self):
-        return (self.vertices[0], self.vertices[1], self.vertices[2], self.vertices[3]).__hash__()
+        return sum([self.vertices[i].__hash__() for i in range(len(self.vertices))])
+
+    def __eq__(self, other):
+        s1 = set(self.vertices)
+        s2 = set(other.vertices)
+        return s1 == s2
 
     def update_by_deltas(self, vertices_deltas):
         for i, v in enumerate(self.vertices):
-            v.update_vertex(vertices_deltas[i])
+            # v.update_vertex(vertices_deltas[i])
+            # print(v.neighbors_count)
+            # print(v.loc)
+            # print(v.loc + vertices_deltas[i] / v.neighbors_count)
+
+            v.loc = v.loc + vertices_deltas[i] / v.neighbors_count
 
     @staticmethod
     def determinant_3x3(m):
@@ -66,7 +78,8 @@ class Tetrahedron:
 
     def translate(self, vec):
         for vert in self.vertices:
-            vert.update_vertex(vec)
+            # vert.update_vertex(vec)
+            vert.loc = vert.loc + vec
 
     def get_diff_occupancy(self):
         return self.occupancy + 0.05
@@ -106,9 +119,12 @@ class Face:
 class Vertex:
     def __init__(self, x, y, z):
         self.loc = torch.tensor([x, y, z], dtype=torch.float32)
+        self.neighbors_count = 0.
 
-    def update_vertex(self, move_vector):
-        self.loc = self.loc + move_vector
+    # def update_vertex(self, move_vector):
+    #     # print(move_vector / self.neighbors_count)
+    #     print(move_vector)
+    #     self.loc = self.loc + move_vector / self.neighbors_count
 
     def get_xyz(self):
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
@@ -117,6 +133,9 @@ class Vertex:
     def __hash__(self):
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
         return (x, y, z).__hash__()
+
+    def __eq__(self, other):
+        return self.loc[0] == other.loc[0] and self.loc[1] == other.loc[1] and self.loc[2] == other.loc[2]
 
 
 class UnitCube:
@@ -200,8 +219,12 @@ class QuarTet:
 
     def merge_same_vertices(self):
         all_vertices = {}
+        
         for tet in self.curr_tetrahedrons:
             for v in tet.vertices:
+                # TODO: X
+                # if v in all_vertices:
+                #     del all_vertices[v]
                 all_vertices[v] = v
 
         for tet in self.curr_tetrahedrons:
@@ -209,6 +232,10 @@ class QuarTet:
             for v in tet.vertices:
                 new_vertices.append(all_vertices[v])
             tet.vertices = new_vertices
+
+        for tet in self.curr_tetrahedrons:
+            for v in tet.vertices:
+                v.neighbors_count += 1
 
     def zero_grad(self):
         for tet in self.curr_tetrahedrons:
@@ -284,12 +311,15 @@ class QuarTet:
         self.curr_tetrahedrons = []
         with open(path, "r") as input_file:
             vertices = []
-            while True:
-                line = next(input_file)
-                if line[0] == 'f':
-                    break
-                coordinates = line.split(' ')
-                vertices.append(Vertex(*[float(c) for c in coordinates[1:]]))
+            try:
+                while True:
+                    line = next(input_file)
+                    if line[0] == 'f':
+                        break
+                    coordinates = line.split(' ')
+                    vertices.append(Vertex(*[float(c) for c in coordinates[1:]]))
+            except StopIteration:
+                pass
 
             try:
                 while True:

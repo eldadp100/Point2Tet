@@ -26,6 +26,11 @@ class PointCloud:
             self.points = torch.cat([self.points, new_points])
             curr_mult -= multiple
 
+    def normalize(self):
+        self.points -= self.points.permute(1, 0).mean(dim=1)
+        self.points /= 2 * self.points.permute(1, 0).max(dim=1).values
+        self.points += 0.5
+
 
     def write_to_file(self, filename):
         with open(filename, "w") as output_file:
