@@ -28,6 +28,7 @@ print(f"finished creating quartet - {time.time() - start_creating_quartet} secon
 input_xyz, input_normals = point2tet_utils.read_pts("pc.ply")
 pc = PointCloud(input_xyz)
 pc.fill_iterior_of_point_cloud()
+input_xyz = pc.points
 # visualize_pointcloud(pc)
 
 # input_xyz = torch.Tensor(pc.points).type(torch.FloatTensor).to(device)[None, :,
@@ -45,10 +46,10 @@ pc.fill_iterior_of_point_cloud()
 # TODO: add normals normalization
 
 
-N = 3000
+N = 300
 indices = np.random.randint(0, input_xyz.shape[0], N)
 input_xyz = input_xyz[indices]
-input_normals = input_normals[indices]
+# input_normals = input_normals[indices]
 
 net, optimizer, scheduler = init_net(opts, device)
 evaluate_every_k_iterations = 50000
@@ -57,7 +58,7 @@ for i in range(opts.iterations):
     # print(f"iteration {i} starts")
     iter_start_time = time.time()
     net(quartet, i)  # in place changes
-    loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz, i)
+    loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz, i, quartet_N_points=N)
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
