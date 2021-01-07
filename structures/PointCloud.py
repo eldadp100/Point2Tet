@@ -26,12 +26,15 @@ class PointCloud:
             self.points = torch.cat([self.points, new_points])
             curr_mult -= multiple
 
+    def normalize(self):
+        self.points -= self.points.permute(1, 0).mean(dim=1)
+        self.points /= 2 * self.points.permute(1, 0).abs().max(dim=1).values
+        self.points += 0.5
 
     def write_to_file(self, filename):
         with open(filename, "w") as output_file:
             for x, y, z in self.points:
                 output_file.write(f"v {x} {y} {z}\n")
-
 
         # calculate SDF
         # sample from the whole cube N points and filter positive SDF points (leave only negative SDF)
@@ -43,7 +46,8 @@ class PointCloud:
 def main():
     device = 'cpu'
     input_xyz, input_normals = point2tet_utils.read_pts("../pc.ply")
-    input_xyz = torch.Tensor(input_xyz).type(torch.FloatTensor).to(device)[None, :, :]  # .type() also changes device somewhy on the server
+    input_xyz = torch.Tensor(input_xyz).type(torch.FloatTensor).to(device)[None, :,
+                :]  # .type() also changes device somewhy on the server
     input_normals = torch.Tensor(input_normals).type(torch.FloatTensor).to(device)[None, :, :]
     input_xyz, input_normals = input_xyz.squeeze(0), input_normals.squeeze(0)
 

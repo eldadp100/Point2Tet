@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
 from torch import optim
-import numpy as np
-
 from structures.QuarTet import QuarTet, Tetrahedron
-import torch.nn.functional as F
 
 NEIGHBORHOOD_SIZE = 5
 
@@ -19,16 +16,14 @@ class MotherCubeConv(nn.Module):
         for tet in mother_cube:
             neighborhood_features = [tet.features]
             for n_tet in tet.neighborhood:
-                neighborhood_features.append(n_tet.prev_features)
+                neighborhood_features.append(n_tet.features)
             neighborhood_features = torch.cat(neighborhood_features, dim=0)
             tets_vectors.append(neighborhood_features)
         tets_vectors = torch.stack(tets_vectors)
-        new_features = self.lin(tets_vectors)
+        new_features = torch.relu(self.lin(tets_vectors))
         for i, tet in enumerate(mother_cube):
             tet.features = new_features[i]
 
-        for tet in mother_cube:
-            tet.prev_features = tet.features
 
 
 class MotherCubePool(nn.Module):

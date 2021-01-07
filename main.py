@@ -10,7 +10,8 @@ import numpy as np
 options = Options()
 opts = options.args
 torch.manual_seed(opts.torch_seed)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 print('device: {}'.format(device))
 
 # mesh = Mesh(opts.mesh_to_read, device=device, hold_history=True)
@@ -23,8 +24,7 @@ print(f"finished creating quartet - {time.time() - start_creating_quartet} secon
 # input point cloud
 # input_xyz, input_normals = torch.rand(100, 3, device=device), torch.rand(100, 3, device=device)
 input_xyz, input_normals = point2tet_utils.read_pts("pc.ply")
-input_xyz = torch.Tensor(input_xyz).type(torch.FloatTensor).to(device)[None, :,
-            :]  # .type() also changes device somewhy on the server
+input_xyz = torch.Tensor(input_xyz).type(torch.FloatTensor).to(device)[None, :,:]  # .type() also changes device somewhy on the server
 input_normals = torch.Tensor(input_normals).type(torch.FloatTensor).to(device)[None, :, :]
 input_xyz, input_normals = input_xyz.squeeze(0), input_normals.squeeze(0)
 
@@ -48,7 +48,7 @@ for i in range(opts.iterations):
     # TODO: Subdivide every opts.upsamp
     print(f"iteration {i} starts")
     iter_start_time = time.time()
-    net(quartet, i)  # in place changes
+    net(quartet, 0)  # in place changes
     loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz)
     optimizer.zero_grad()
     loss.backward()
@@ -57,6 +57,9 @@ for i in range(opts.iterations):
     print(loss)
     # scheduler.step()
     print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
+    # quartet = QuarTet(1, device)
+    quartet.reset()
+
 
     if i != 0 and i % evaluate_every_k_iterations == 0:
         checkpoint_file_path = f"./checkpoints/{opts.name}/model_checkpoint_{i}.pt"
