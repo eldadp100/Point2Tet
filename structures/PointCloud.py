@@ -4,11 +4,20 @@ import numpy as np
 
 
 class PointCloud:
-    def __init__(self, points):
+    def __init__(self):
+        self.points = None
+
+    def init_with_points(self, points):
         self.points = torch.tensor(points)
 
-    def __iter__(self):
-        return self.points.__iter__()
+    def load_file(self, path):
+        # .obj support only
+        xyz = []
+        with open(path, 'r') as f:
+            for line in f:
+                xyz.append([float(v) for v in line.split()[1:]])
+
+        self.points = torch.tensor(xyz)
 
     def fill_iterior_of_point_cloud(self, N=9, drop=0.1):
         """
@@ -42,8 +51,11 @@ class PointCloud:
         # add N points from the boundary (some of the original points)
         # we get 2N points
 
+    def __iter__(self):
+        return self.points.__iter__()
 
-def main():
+
+if __name__ == "__main__":
     device = 'cpu'
     input_xyz, input_normals = point2tet_utils.read_pts("../pc.ply")
     input_xyz = torch.Tensor(input_xyz).type(torch.FloatTensor).to(device)[None, :,
@@ -58,10 +70,7 @@ def main():
     # input_xyz += 0.5
     # input_normals += 0.5
 
-    pc = PointCloud(input_xyz)
+    pc = PointCloud()
+    pc.init_with_points(input_xyz)
     pc.fill_iterior_of_point_cloud(15)
     pc.write_to_file("filled_pc2.obj")
-
-
-if __name__ == "__main__":
-    main()

@@ -19,7 +19,7 @@ class Tetrahedron:
         self.depth = depth
 
         self.init_features = self.features.clone()
-        self.init_vertices = [v.clone() for v in self.vertices]
+        self.init_vertices = [v for v in self.vertices]
 
     def add_neighbor(self, neighbor):
         self.neighborhood.add(neighbor)
@@ -75,7 +75,7 @@ class Tetrahedron:
         return self.occupancy + 0.05
 
     def reset(self):
-        self.features = self.init_features.clone()
+        self.features = self.init_features.clone().to(self.features.device)
         self.vertices = [v.clone() for v in self.init_vertices]
 
 
@@ -119,10 +119,12 @@ class Vertex:
 
     def get_xyz(self):
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
-        return (x, y, z)
+        return x, y, z
 
     def clone(self):
-        return Vertex(*self.get_xyz())
+        v = Vertex(*self.get_xyz())
+        v.loc = v.loc.to(self.loc.device)
+        return v
 
     def __hash__(self):
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
