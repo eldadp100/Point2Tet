@@ -10,6 +10,7 @@ class Options:
         parser = argparse.ArgumentParser(description='Point2Mesh options')
         parser.add_argument('--name', type=str, default='./checkpoints/guitar', help='path to save results to')
         parser.add_argument('--input-pc', type=str, default='./data/guitar.ply', help='input point cloud')
+        parser.add_argument('--continue_train', type=bool, default=False, help='continue train from the latest model')
 
         # HYPER PARAMETERS - RECONSTRUCTION
         parser.add_argument('--torch-seed', type=int, metavar='N', default=5, help='torch random seed')
@@ -22,6 +23,7 @@ class Options:
         parser.add_argument('--res-blocks', type=int, metavar='N', default=3, help='')
         parser.add_argument('--ncf', nargs='+', default=[16, 32, 64, 64, 128], type=int, help='convs to do')
         parser.add_argument('--pr', nargs='+', default=[0.3] * 5, type=float, help='pooling ratios to do')
+        parser.add_argument('--save_freq', type=int, default=100, help='save the model each {save_freq} iterations')
 
         # MULTI GPUS TRAINING
 

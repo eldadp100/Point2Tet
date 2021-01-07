@@ -6,6 +6,7 @@ from options import Options
 import time
 from structures.QuarTet import QuarTet
 import numpy as np
+import os
 
 options = Options()
 opts = options.args
@@ -43,7 +44,11 @@ input_xyz = input_xyz[indices]
 input_normals = input_normals[indices]
 
 net, optimizer, scheduler = init_net(opts, device)
-evaluate_every_k_iterations = 500
+if opts.continue_train:
+    print("Loading latest network...")
+    net.load_state_dict(torch.load(f'./checkpoints/{opts.name}/model_checkpoint_latest.py'))
+    print("Finished loading network")
+
 for i in range(opts.iterations):
     # TODO: Subdivide every opts.upsamp
     print(f"iteration {i} starts")
@@ -60,16 +65,18 @@ for i in range(opts.iterations):
     # quartet = QuarTet(1, device)
     quartet.reset()
 
+    if i != 0 and i % opts.save_freq == 0:
+        os.rename(f'./checkpoints/{opts.name}/model_checkpoint_latest.pt', f'./checkpoints/{opts.name}/model_checkpoint_{i - 1}.pt')
 
-    if i != 0 and i % evaluate_every_k_iterations == 0:
-        checkpoint_file_path = f"./checkpoints/{opts.name}/model_checkpoint_{i}.pt"
-        quartet_file_path = f"./checkpoints/{opts.name}/quartet_{i}"
-        mesh_file_path = f"./checkpoints/{opts.name}/mesh_{i}"
+        checkpoint_file_path = f"./checkpoints/{opts.name}/model_checkpoint_latest.pt"
+        quartet_file_path = f"./checkpoints/{opts.name}/quartet_latest"
+        mesh_file_path = f"./checkpoints/{opts.name}/mesh_latest"
 
         state_dict = {
             "net": net.state_dict(),
             "optim": optimizer.state_dict()
         }
 
+        torch.save(net.state_dict(), checkpoint_file_path)
         quartet.export(quartet_file_path)
         quartet.export_mesh(mesh_file_path)
