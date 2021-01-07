@@ -1,21 +1,18 @@
 import torch
 from chamferdist import ChamferDistance
 
+
 def chamfer_dist(src_pc, dst_pc):
     chamferDist = ChamferDistance()
     src_pc = src_pc.type(torch.FloatTensor)
     dst_pc = dst_pc.type(torch.FloatTensor)
     dist_forward = chamferDist(src_pc, dst_pc)
-    return dist_forward#.detach().cpu().item()
+    return dist_forward
 
-def chamfer_distance_quartet_to_point_cloud(quartet, pc, i, quartet_N_points=3000):
+
+def chamfer_distance_quartet_to_point_cloud(quartet, pc, quartet_N_points=3000):
     quartet_pc = quartet.sample_point_cloud(quartet_N_points)
-    loss = chamfer_dist(quartet_pc.unsqueeze(1), pc.unsqueeze(1))
-    # loss = torch.stack([tet.vertices[0].loc for tet in quartet]).abs().sum() / 1000
-    if i % 200 != 0:
-        for tet in quartet:
-            tet.update_by_deltas(-tet.last_move)
-    return loss
+    return chamfer_dist(quartet_pc.unsqueeze(1), pc.unsqueeze(1))
 
 # from pytorch3d.loss import chamfer_distance
 # def chamfer_distance_quartet_to_point_cloud(quartet, pc):

@@ -26,6 +26,9 @@ class Tetrahedron:
         self.vertices = self.init_vertices
         self.features = self.init_features
 
+        self.init_features = self.features.clone()
+        self.init_vertices = [v.clone() for v in self.vertices]
+
     def add_neighbor(self, neighbor):
         self.neighborhood.add(neighbor)
 
@@ -90,6 +93,10 @@ class Tetrahedron:
     def get_diff_occupancy(self):
         return self.occupancy + 0.05
 
+    def reset(self):
+        self.features = self.init_features.clone()
+        self.vertices = [v.clone() for v in self.init_vertices]
+
 
 def calculate_and_update_neighborhood(list_of_tetrahedrons):
     for tet1 in list_of_tetrahedrons:
@@ -139,6 +146,9 @@ class Vertex:
     def get_xyz(self):
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
         return (x, y, z)
+
+    def clone(self):
+        return Vertex(*self.get_xyz())
 
     def __hash__(self):
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
@@ -360,6 +370,9 @@ class QuarTet:
         for tet in self.curr_tetrahedrons:
             tet.features.requires_grad_()
 
+    def reset(self):
+        for tet in self.curr_tetrahedrons:
+            tet.reset()
 
     def create_mesh(self):
         faces = list()
@@ -386,7 +399,8 @@ class QuarTet:
                     vertices[(x, y, z)] = c
                     c += 1
                 obj_file_str_vert.append(f"v {x} {y} {z}\n")
-            obj_file_str_faces.append(f"f {vertices[f_coords[0].get_xyz()]} {vertices[f_coords[1].get_xyz()]} {vertices[f_coords[2].get_xyz()]}\n")
+            obj_file_str_faces.append(
+                f"f {vertices[f_coords[0].get_xyz()]} {vertices[f_coords[1].get_xyz()]} {vertices[f_coords[2].get_xyz()]}\n")
         with open(path, 'w+') as f:
             f.write("\n".join(obj_file_str_vert))
             f.write("\n".join(obj_file_str_faces))
