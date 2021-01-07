@@ -28,6 +28,7 @@ print(f"finished creating quartet - {time.time() - start_creating_quartet} secon
 input_xyz, input_normals = point2tet_utils.read_pts("pc.ply")
 pc = PointCloud(input_xyz)
 pc.fill_iterior_of_point_cloud()
+pc.normalize()
 input_xyz = pc.points
 # visualize_pointcloud(pc)
 
@@ -54,15 +55,17 @@ input_xyz = input_xyz[indices]
 net, optimizer, scheduler = init_net(opts, device)
 evaluate_every_k_iterations = 50000
 for i in range(opts.iterations):
+    quartet = QuarTet(1, device)
     # TODO: Subdivide every opts.upsamp
     # print(f"iteration {i} starts")
     iter_start_time = time.time()
-    net(quartet, i)  # in place changes
+    net(quartet, 0)  # in place changes
     loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz, i, quartet_N_points=N)
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
     quartet.zero_grad()
+    # quartet.reset_features() 
     print(loss)
     # scheduler.step()
     # print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")

@@ -19,6 +19,12 @@ class Tetrahedron:
         self.pooled = False
         self.depth = depth
         self.last_move = None
+        self.init_vertices = [v.clone() for v in self.vertices]
+        self.init_features = self.features.clone().detach()
+
+    def reset_features(self):
+        self.vertices = self.init_vertices
+        self.features = self.init_features
 
     def add_neighbor(self, neighbor):
         self.neighborhood.add(neighbor)
@@ -125,6 +131,10 @@ class Vertex:
     #     # print(move_vector / self.neighbors_count)
     #     print(move_vector)
     #     self.loc = self.loc + move_vector / self.neighbors_count
+
+    def clone(self):
+        x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
+        return Vertex(x, y, z)
 
     def get_xyz(self):
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
@@ -244,6 +254,10 @@ class QuarTet:
             for i in range(4):
                 tet.vertices[i].loc = tet.vertices[i].loc.detach().clone()
 
+    def reset_features(self):
+        for tet in self:
+            tet.reset_features()
+
     def init_occupancy_with_SDF(self, SDF):
         # TODO: that will improve results
         pass
@@ -278,7 +292,9 @@ class QuarTet:
 
     def sample_point_cloud(self, pc_size):
         samples = []
-        occupied_tets = self.get_occupied_tets()
+        occupied_tets = self.curr_tetrahedrons
+        # for tet in occupied_tets:
+        #     print([v.loc for v in tet.vertices])
         volumes = [tet.volume() * tet.get_diff_occupancy() for tet in occupied_tets]
         volumes_total = sum(volumes)
 
@@ -288,6 +304,7 @@ class QuarTet:
             for _ in range(points_count[i]):
                 samples.append(sum([vertex.loc * np.random.uniform(0, 1) for vertex in tet.vertices]))
 
+        print(len(points_count), len(samples), pc_size)
         samples = random.choices(samples, k=pc_size)
         return torch.stack(samples)
 

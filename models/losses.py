@@ -12,7 +12,7 @@ def chamfer_distance_quartet_to_point_cloud(quartet, pc, i, quartet_N_points=300
     quartet_pc = quartet.sample_point_cloud(quartet_N_points)
     loss = chamfer_dist(quartet_pc.unsqueeze(1), pc.unsqueeze(1))
     # loss = torch.stack([tet.vertices[0].loc for tet in quartet]).abs().sum() / 1000
-    if i % 100 != 0:
+    if i % 200 != 0:
         for tet in quartet:
             tet.update_by_deltas(-tet.last_move)
     return loss

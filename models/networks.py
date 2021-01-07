@@ -19,7 +19,8 @@ class MotherCubeConv(nn.Module):
         for tet in mother_cube:
             neighborhood_features = [tet.features]
             for n_tet in tet.neighborhood:
-                neighborhood_features.append(n_tet.prev_features)
+                # neighborhood_features.append(n_tet.prev_features)
+                neighborhood_features.append(n_tet.features)
             neighborhood_features = torch.cat(neighborhood_features, dim=0)
             tets_vectors.append(neighborhood_features)
         tets_vectors = torch.stack(tets_vectors)
@@ -27,8 +28,8 @@ class MotherCubeConv(nn.Module):
         for i, tet in enumerate(mother_cube):
             tet.features = new_features[i]
 
-        for tet in mother_cube:
-            tet.prev_features = tet.features
+        # for tet in mother_cube:
+        #     tet.prev_features = tet.features
 
 
 class MotherCubePool(nn.Module):
@@ -65,10 +66,11 @@ class OurNet(nn.Module):
     def __init__(self):
         super(OurNet, self).__init__()
 
-        ncf = [32, 64, 64, 32]  # last must be 3 because we iterate
+        # ncf = [32, 64, 64, 32]  # last must be 3 because we iterate
+        ncf = [3, 32, 128, 256]  # last must be 3 because we iterate
 
-        self.embedding_at_start = MotherCubeConv(3, ncf[0])
-        # self.conv_net = TetCNN_PP(ncf)  # TetCNN++
+        # self.embedding_at_start = MotherCubeConv(3, ncf[0])
+        self.conv_net = TetCNN_PP(ncf)  # TetCNN++
         self.net_vertices_movements = nn.Sequential(
             nn.Linear(ncf[-1], 100),
             nn.ReLU(),
@@ -77,12 +79,12 @@ class OurNet(nn.Module):
             nn.ReLU(),
             nn.Linear(100, 12)
         )  # 3D movement
-        self.net_occupancy = nn.Linear(32, 1)  # Binary classifier - occupancy
+        self.net_occupancy = nn.Linear(ncf[-1], 1)  # Binary classifier - occupancy
 
     def forward(self, mother_cube, iteration_number):
-        if iteration_number == 0:
-            self.embedding_at_start(mother_cube)
-        # self.conv_net(mother_cube)
+        # if iteration_number == 0:
+        #     self.embedding_at_start(mother_cube)
+        self.conv_net(mother_cube)
         for tet in mother_cube:
             tet_deltas = self.net_vertices_movements(tet.features).view(4, 3)
             tet.last_move = tet_deltas
