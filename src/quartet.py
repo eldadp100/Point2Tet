@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import torch
 import random
@@ -51,7 +53,7 @@ class Tetrahedron:
 
     def update_by_deltas(self, vertices_deltas):
         for i, v in enumerate(self.vertices):
-            v.update_vertex(vertices_deltas[i])
+            v.update_vertex(vertices_deltas)
 
     @staticmethod
     def determinant_3x3(m):
@@ -304,16 +306,35 @@ class QuarTet:
         return result
 
     def sample_point_cloud(self, pc_size):
-        samples = []
         occupied_tets = self.get_occupied_tets()
         volumes = [tet.volume() * tet.occupancy for tet in occupied_tets]
         volumes_total = sum(volumes)
 
         points_count = [np.int(np.ceil(((volume / volumes_total) * pc_size).item())) for volume in volumes]
+        # tmp_tets = [[tet] * points_count[i] for i, tet in enumerate(self.curr_tetrahedrons)]
+        # tets = []
+        # for tl in tmp_tets:
+        #     for t in tl:
+        #         tets.append(t)
+        # tets_vertices_x = torch.tensor([[v.loc[0] for v in tet.vertices] for tet in tets])
+        # tets_vertices_y = torch.tensor([[v.loc[1] for v in tet.vertices] for tet in tets], device='cpu')
+        # tets_vertices_z = torch.tensor([[v.loc[2] for v in tet.vertices] for tet in tets])
+        #
+        # w = torch.rand(len(tets), 4)  # random weights for the 4 vertices
+        # new_xs = torch.sum(w * tets_vertices_x, dim=1) / 4.
+        # new_ys = torch.sum(w * tets_vertices_y, dim=1) / 4.
+        # new_zs = torch.sum(w * tets_vertices_z, dim=1) / 4.
+        #
+        # samples = torch.stack([new_xs.squeeze(), new_ys.squeeze(), new_zs.squeeze()]).permute(1, 0)
+        # samples = random.choices(samples, k=pc_size)
+        # return torch.stack(samples)
 
+        samples = []
         for i, tet in enumerate(occupied_tets):
             for _ in range(points_count[i]):
-                samples.append(sum([vertex.loc * np.random.uniform(0, 1) for vertex in tet.vertices]))
+                samples.append(
+                    np.random.rand() + tet.vertices[0].loc + np.random.rand() * tet.vertices[1].loc + np.random.rand() *
+                    tet.vertices[2].loc + np.random.rand() * tet.vertices[3].loc)
 
         samples = random.choices(samples, k=pc_size)
         return torch.stack(samples)
@@ -372,11 +393,11 @@ class QuarTet:
         self.merge_same_vertices()
 
         for tet in self.curr_tetrahedrons:
-            tet.occupancy = tet.occupancy.to(device)
+            tet.occupancy = tet.occupancy.cpu()
             tet.features = tet.features.to(device)
             tet.prev_features = tet.prev_features.to(device)
             for i in range(4):
-                tet.vertices[i].loc = tet.vertices[i].loc.to(device)
+                tet.vertices[i].loc = tet.vertices[i].loc.cpu()
 
         for tet in self.curr_tetrahedrons:
             tet.features.requires_grad_()
@@ -476,6 +497,7 @@ class QuarTet:
         pc = PointCloud()
         pc.init_with_points(points)
         pc.write_to_file(path)
+
 
 
 if __name__ == '__main__':

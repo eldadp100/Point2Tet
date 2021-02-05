@@ -12,7 +12,8 @@ import os
 options = Options()
 opts = options.args
 torch.manual_seed(opts.torch_seed)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 print('device: {}'.format(device))
 
 
@@ -41,19 +42,23 @@ print(f"finished creating quartet - {time.time() - start_creating_quartet} secon
 pc = PointCloud()
 pc.load_file(opts.input_filled_pc)
 pc.normalize()
-input_xyz = pc.points
-
-chamfer_sample_size = min(input_xyz.shape[0], opts.chamfer_samples)
-indices = np.random.randint(0, input_xyz.shape[0], chamfer_sample_size)
-input_xyz = input_xyz[indices]
+original_input_xyz = pc.points
 
 net, optimizer, scheduler = init_net(opts, device)
 for i in range(opts.iterations):
-    # TODO: Subdivide every opts.upsamp
     print(f"iteration {i} starts")
     iter_start_time = time.time()
+
+    # sample different points every iteration
+    chamfer_sample_size = min(original_input_xyz.shape[0], opts.chamfer_samples)
+    indices = np.random.randint(0, original_input_xyz.shape[0], chamfer_sample_size)
+    input_xyz = original_input_xyz[indices]
+
+    # TODO: Subdivide every opts.upsamp
     net(quartet)  # in place changes
+    s = time.time()
     _loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz, quartet_N_points=chamfer_sample_size)
+    print(time.time() - s)
     optimizer.zero_grad()
     _loss.backward()
     optimizer.step()
@@ -90,6 +95,8 @@ for i in range(opts.iterations):
             quartet.export_mesh(out_mesh_file_path)
         except:
             pass
-
     quartet.reset()
+
     print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
+
+print(_loss)

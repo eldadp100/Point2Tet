@@ -17,7 +17,7 @@ class Options:
 
         # HYPER PARAMETERS - RECONSTRUCTION
         parser.add_argument('--torch-seed', type=int, metavar='N', default=5, help='torch random seed')
-        parser.add_argument('--chamfer_samples', type=int, metavar='N', default=25000)
+        parser.add_argument('--chamfer_samples', type=int, metavar='N', default=1000, help='resampled every iteration')
         parser.add_argument('--iterations', type=int, metavar='N', default=10000, help='number of iterations to do')
         parser.add_argument('--upsamp', type=int, metavar='N', default=1000, help='upsample each {upsamp} iteration')
 
