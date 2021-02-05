@@ -1,8 +1,6 @@
 import shutil
-
 import torch
 from networks import init_net
-import _utils
 from loss import chamfer_distance_quartet_to_point_cloud
 from options import Options
 import time
@@ -10,7 +8,6 @@ from quartet import QuarTet
 from pointcloud import PointCloud
 import numpy as np
 import os
-import mesh
 
 options = Options()
 opts = options.args
@@ -20,11 +17,10 @@ print('device: {}'.format(device))
 
 
 def init_environment(opts):
-    checkpoint_folder = "../checkpoints"
-    if not os.path.exists(checkpoint_folder):
-        os.mkdir(checkpoint_folder)
+    if not os.path.exists(opts.checkpoint_folder):
+        os.mkdir(opts.checkpoint_folder)
 
-    checkpoint_folder = f"../checkpoints/{opts.name}"
+    checkpoint_folder = f"{opts.checkpoint_folder}/{opts.name}"
     if os.path.exists(checkpoint_folder):
         shutil.rmtree(checkpoint_folder)
     time.sleep(0.1)
@@ -37,17 +33,14 @@ init_environment(opts)
 
 start_creating_quartet = time.time()
 print("start creating quartet")
-quartet = QuarTet(3, device)
+quartet = QuarTet(opts.init_cube, device)
 print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
 
-# input point cloud
+# input filled point cloud
 # input_xyz, input_normals = torch.rand(100, 3, device=device), torch.rand(100, 3, device=device)
-_mesh = mesh.Mesh('../init_mesh.obj')
-
 pc = PointCloud()
-pc.load_file('../pc.obj')
+pc.load_file(opts.input_filled_pc)
 pc.normalize()
-pc.fill_iterior_of_point_cloud(method='mesh', mesh=_mesh)
 input_xyz = pc.points
 
 N = 20000
@@ -70,13 +63,13 @@ for i in range(opts.iterations):
     print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
 
     if i != 0 and i % opts.save_freq == 0:
-        os.rename(f'../checkpoints/{opts.name}/model_checkpoint_latest.pt',
-                  f'../checkpoints/{opts.name}/model_checkpoint_{i - opts.save_freq}.pt')
+        os.rename(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt',
+                  f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_{i - opts.save_freq}.pt')
 
-        checkpoint_file_path = f"../checkpoints/{opts.name}/model_checkpoint_latest.pt"
-        out_pc_file_path = f"../checkpoints/{opts.name}/pc_{i}.obj"
-        out_quartet_file_path = f"../checkpoints/{opts.name}/quartet_{i}.obj"
-        out_mesh_file_path = f"../checkpoints/{opts.name}/mesh_{i}.obj"
+        checkpoint_file_path = f"{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt"
+        out_pc_file_path = f"{opts.checkpoint_folder}/{opts.name}/pc_{i}.obj"
+        out_quartet_file_path = f"{opts.checkpoint_folder}/{opts.name}/quartet_{i}.obj"
+        out_mesh_file_path = f"{opts.checkpoint_folder}/{opts.name}/mesh_{i}.obj"
 
         state_dict = {
             "net": net.state_dict(),
