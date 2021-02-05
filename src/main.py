@@ -43,8 +43,8 @@ pc.load_file(opts.input_filled_pc)
 pc.normalize()
 input_xyz = pc.points
 
-N = 20000
-indices = np.random.randint(0, input_xyz.shape[0], N)
+chamfer_sample_size = min(input_xyz.shape[0], opts.chamfer_samples)
+indices = np.random.randint(0, input_xyz.shape[0], chamfer_sample_size)
 input_xyz = input_xyz[indices]
 
 net, optimizer, scheduler = init_net(opts, device)
@@ -52,8 +52,8 @@ for i in range(opts.iterations):
     # TODO: Subdivide every opts.upsamp
     print(f"iteration {i} starts")
     iter_start_time = time.time()
-    net(quartet, 0)  # in place changes
-    _loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz, quartet_N_points=N)
+    net(quartet)  # in place changes
+    _loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz, quartet_N_points=chamfer_sample_size)
     optimizer.zero_grad()
     _loss.backward()
     optimizer.step()
