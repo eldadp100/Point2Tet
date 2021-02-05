@@ -67,13 +67,17 @@ class Tetrahedron:
                 a[1] - b[1],
                 a[2] - b[2])
 
+    # def volume(self):
+    #     p1, p2, p3, p4 = [v.loc for v in self.vertices]
+    #     return (abs(self.determinant_3x3((
+    #         self.subtract(p1, p2),
+    #         self.subtract(p2, p3),
+    #         self.subtract(p3, p4),
+    #     ))) / 6.0)
+
     def volume(self):
         p1, p2, p3, p4 = [v.loc for v in self.vertices]
-        return (abs(self.determinant_3x3((
-            self.subtract(p1, p2),
-            self.subtract(p2, p3),
-            self.subtract(p3, p4),
-        ))) / 6.0)
+        return torch.det(torch.stack([p1 - p4, p2 - p4, p3 - p4])) / 6
 
     def translate(self, vec):
         for vert in self.vertices:
