@@ -45,6 +45,10 @@ pc.normalize()
 original_input_xyz = pc.points
 
 net, optimizer, scheduler = init_net(opts, device)
+
+print(f'opts.continue_train = {opts.continue_train}')
+print(f'opts.save_freq = {opts.save_freq}')
+
 for i in range(opts.iterations):
     print(f"iteration {i} starts")
     iter_start_time = time.time()
@@ -67,8 +71,9 @@ for i in range(opts.iterations):
     # scheduler.step()
 
     if i != 0 and i % opts.save_freq == 0:
-        os.rename(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt',
-                  f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_{i - opts.save_freq}.pt')
+        if os.path.isfile(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt'):
+            os.rename(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt',
+                      f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_{i - opts.save_freq}.pt')
 
         checkpoint_file_path = f"{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt"
         out_pc_file_path = f"{opts.checkpoint_folder}/{opts.name}/pc_{i}.obj"

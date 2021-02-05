@@ -103,8 +103,13 @@ def get_scheduler(iters, optim):
 def init_net(opts, device):
     net = OurNet(opts.ncf).to(device)
     optimizer = optim.Adam(net.parameters(), lr=opts.lr)
-    scheduler = get_scheduler(opts.iterations, optimizer)
 
+    if opts.continue_train:
+        checkpoint = torch.load(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt')
+        net.load_state_dict(checkpoint['net'])
+        optimizer.load_state_dict(checkpoint['optim'])
+
+    scheduler = get_scheduler(opts.iterations, optimizer)
     return net, optimizer, scheduler
 
 
