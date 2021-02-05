@@ -1,8 +1,6 @@
 import shutil
-
 import torch
 from networks import init_net
-import _utils
 from loss import chamfer_distance_quartet_to_point_cloud
 from options import Options
 import time
@@ -19,11 +17,10 @@ print('device: {}'.format(device))
 
 
 def init_environment(opts):
-    checkpoint_folder = "./checkpoints"
-    if not os.path.exists(checkpoint_folder):
-        os.mkdir(checkpoint_folder)
+    if not os.path.exists(opts.checkpoint_folder):
+        os.mkdir(opts.checkpoint_folder)
 
-    checkpoint_folder = f"./checkpoints/{opts.name}"
+    checkpoint_folder = f"{opts.checkpoint_folder}/{opts.name}"
     if os.path.exists(checkpoint_folder):
         shutil.rmtree(checkpoint_folder)
     time.sleep(0.1)
@@ -36,18 +33,18 @@ init_environment(opts)
 
 start_creating_quartet = time.time()
 print("start creating quartet")
-quartet = QuarTet(1, device)
+quartet = QuarTet(opts.init_cube, device)
 print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
 
-# input point cloud
+# input filled point cloud
 # input_xyz, input_normals = torch.rand(100, 3, device=device), torch.rand(100, 3, device=device)
 pc = PointCloud()
-pc.load_file('../filled_pc2.obj')
+pc.load_file(opts.input_filled_pc)
 pc.normalize()
 input_xyz = pc.points
 
-N = 20000
-indices = np.random.randint(0, input_xyz.shape[0], N)
+chamfer_sample_size = min(input_xyz.shape[0], opts.chamfer_samples)
+indices = np.random.randint(0, input_xyz.shape[0], chamfer_sample_size)
 input_xyz = input_xyz[indices]
 
 net, optimizer, scheduler = init_net(opts, device)
@@ -55,8 +52,8 @@ for i in range(opts.iterations):
     # TODO: Subdivide every opts.upsamp
     print(f"iteration {i} starts")
     iter_start_time = time.time()
-    net(quartet, 0)  # in place changes
-    _loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz, quartet_N_points=N)
+    net(quartet)  # in place changes
+    _loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz, quartet_N_points=chamfer_sample_size)
     optimizer.zero_grad()
     _loss.backward()
     optimizer.step()
@@ -66,13 +63,13 @@ for i in range(opts.iterations):
     print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
 
     if i != 0 and i % opts.save_freq == 0:
-        os.rename(f'./checkpoints/{opts.name}/model_checkpoint_latest.pt',
-                  f'./checkpoints/{opts.name}/model_checkpoint_{i - opts.save_freq}.pt')
+        os.rename(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt',
+                  f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_{i - opts.save_freq}.pt')
 
-        checkpoint_file_path = f"./checkpoints/{opts.name}/model_checkpoint_latest.pt"
-        out_pc_file_path = f"./checkpoints/{opts.name}/pc_{i}.obj"
-        out_quartet_file_path = f"./checkpoints/{opts.name}/quartet_{i}.obj"
-        out_mesh_file_path = f"./checkpoints/{opts.name}/mesh_{i}.obj"
+        checkpoint_file_path = f"{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt"
+        out_pc_file_path = f"{opts.checkpoint_folder}/{opts.name}/pc_{i}.obj"
+        out_quartet_file_path = f"{opts.checkpoint_folder}/{opts.name}/quartet_{i}.obj"
+        out_mesh_file_path = f"{opts.checkpoint_folder}/{opts.name}/mesh_{i}.obj"
 
         state_dict = {
             "net": net.state_dict(),

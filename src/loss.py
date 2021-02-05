@@ -7,7 +7,6 @@ def chamfer_dist(src_pc, dst_pc):
     src_pc = src_pc.type(torch.FloatTensor)
     dst_pc = dst_pc.type(torch.FloatTensor)
     dist_forward = chamferDist(src_pc, dst_pc)
-    dist_forward = chamferDist(src_pc, dst_pc)
     return dist_forward
 
 

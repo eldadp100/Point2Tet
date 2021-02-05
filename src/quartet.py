@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import random
 from pointcloud import PointCloud
-
 import itertools
 
 
@@ -24,6 +23,7 @@ class Tetrahedron:
         self.init_features = self.features.clone()
         self.init_vertices = [v for v in self.vertices]
         self.init_occupancy = self.occupancy.clone()
+
     def add_neighbor(self, neighbor):
         self.neighborhood.add(neighbor)
 
@@ -47,7 +47,7 @@ class Tetrahedron:
         return (self.vertices[0], self.vertices[1], self.vertices[2], self.vertices[3]).__hash__()
 
     def __iter__(self):
-    	return iter(self.vertices)
+        return iter(self.vertices)
 
     def update_by_deltas(self, vertices_deltas):
         for i, v in enumerate(self.vertices):
@@ -86,26 +86,18 @@ class Tetrahedron:
         return list(itertools.combinations(self.vertices, 3))
 
 
-def calculate_and_update_neighborhood(list_of_tetrahedrons):
-    for tet1 in list_of_tetrahedrons:
-        for tet2 in list_of_tetrahedrons:
-            if tet1.is_neighbor(tet2):
-                tet1.add_neighbor(tet2)
-                tet2.add_neighbor(tet1)
-
-
-def new_calculate_and_update_neighborhood(tetrahedrons, vertices):
+def calculate_and_update_neighborhood(tetrahedrons, vertices):
     vertices_to_tets_dict = dict()
     for vertex in vertices:
         vertices_to_tets_dict[vertex] = set()
     for tet in tetrahedrons:
         for vertex in tet:
             vertices_to_tets_dict[vertex].add(tet)
-    
+
     for tet in tetrahedrons:
         for face in tet.get_faces():
             neighbor_set = set.intersection(*[vertices_to_tets_dict[vertex] for vertex in face])
-            assert(len(neighbor_set) == 1 or len(neighbor_set) == 2)
+            assert (len(neighbor_set) == 1 or len(neighbor_set) == 2)
             for neighbor in neighbor_set:
                 if neighbor != tet:
                     neighbor.add_neighbor(tet)
@@ -176,79 +168,81 @@ class Vertex:
         return not (self >= other)
 
 
-class UnitCube:
-    def __init__(self, pos):
-        self.pos = pos
-
-    def divide_to_24(self):
-        # (000) (010) (001) (011) --> (0 0.5 0.5)
-        tri1 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 1, 0), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri2 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 0, 1), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri3 = Tetrahedron([Vertex(0, 1, 1), Vertex(0, 1, 0), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri4 = Tetrahedron([Vertex(0, 1, 1), Vertex(0, 0, 1), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-
-        # (000) (100) (010) (110) --> (0.5 0.5 0)
-        tri5 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
-        tri6 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 1, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
-        tri7 = Tetrahedron([Vertex(1, 1, 0), Vertex(1, 0, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
-        tri8 = Tetrahedron([Vertex(1, 1, 0), Vertex(0, 1, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
-
-        # (000) (100) (001) (101) --> (0.5 0 0.5)
-        tri9 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri10 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 0, 1), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri11 = Tetrahedron([Vertex(1, 0, 1), Vertex(1, 0, 0), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri12 = Tetrahedron([Vertex(1, 0, 1), Vertex(0, 0, 1), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
-
-        # (111) (011) (110) (010) --> (1 0.5 0.5)
-        tri13 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 1, 0), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri14 = Tetrahedron([Vertex(1, 1, 1), Vertex(0, 1, 1), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri15 = Tetrahedron([Vertex(0, 1, 0), Vertex(1, 1, 0), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri16 = Tetrahedron([Vertex(0, 1, 0), Vertex(0, 1, 1), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
-
-        # (111) (101) (110) (100) --> (0.5 0.5 1)
-        tri17 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 0, 1), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri18 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 1, 0), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri19 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 0, 1), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-        tri20 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 1, 0), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-
-        # (111) (101) (011) (001) --> (0.5 1 0.5)
-        tri21 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 0, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
-        tri22 = Tetrahedron([Vertex(1, 1, 1), Vertex(0, 1, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
-        tri23 = Tetrahedron([Vertex(0, 0, 1), Vertex(1, 0, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
-        tri24 = Tetrahedron([Vertex(0, 0, 1), Vertex(0, 1, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
-
-        tets = [tri1, tri2, tri3, tri4, tri5, tri6, tri7, tri8, tri9, tri10, tri11, tri12, tri13, tri14, tri15,
-                tri16, tri17, tri18, tri19, tri20, tri21, tri22, tri23, tri24]
-
-        for tet in tets:
-            tet.translate(self.pos)
-
-        return tets
-
+# class UnitCube:
+#     def __init__(self, pos):
+#         self.pos = pos
+#
+#     def divide_to_24(self):
+#         # (000) (010) (001) (011) --> (0 0.5 0.5)
+#         tri1 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 1, 0), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+#         tri2 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 0, 1), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+#         tri3 = Tetrahedron([Vertex(0, 1, 1), Vertex(0, 1, 0), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+#         tri4 = Tetrahedron([Vertex(0, 1, 1), Vertex(0, 0, 1), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+#
+#         # (000) (100) (010) (110) --> (0.5 0.5 0)
+#         tri5 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
+#         tri6 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 1, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
+#         tri7 = Tetrahedron([Vertex(1, 1, 0), Vertex(1, 0, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
+#         tri8 = Tetrahedron([Vertex(1, 1, 0), Vertex(0, 1, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
+#
+#         # (000) (100) (001) (101) --> (0.5 0 0.5)
+#         tri9 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
+#         tri10 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 0, 1), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
+#         tri11 = Tetrahedron([Vertex(1, 0, 1), Vertex(1, 0, 0), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
+#         tri12 = Tetrahedron([Vertex(1, 0, 1), Vertex(0, 0, 1), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
+#
+#         # (111) (011) (110) (010) --> (1 0.5 0.5)
+#         tri13 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 1, 0), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
+#         tri14 = Tetrahedron([Vertex(1, 1, 1), Vertex(0, 1, 1), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
+#         tri15 = Tetrahedron([Vertex(0, 1, 0), Vertex(1, 1, 0), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
+#         tri16 = Tetrahedron([Vertex(0, 1, 0), Vertex(0, 1, 1), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
+#
+#         # (111) (101) (110) (100) --> (0.5 0.5 1)
+#         tri17 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 0, 1), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+#         tri18 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 1, 0), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+#         tri19 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 0, 1), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+#         tri20 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 1, 0), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
+#
+#         # (111) (101) (011) (001) --> (0.5 1 0.5)
+#         tri21 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 0, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
+#         tri22 = Tetrahedron([Vertex(1, 1, 1), Vertex(0, 1, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
+#         tri23 = Tetrahedron([Vertex(0, 0, 1), Vertex(1, 0, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
+#         tri24 = Tetrahedron([Vertex(0, 0, 1), Vertex(0, 1, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
+#
+#         tets = [tri1, tri2, tri3, tri4, tri5, tri6, tri7, tri8, tri9, tri10, tri11, tri12, tri13, tri14, tri15,
+#                 tri16, tri17, tri18, tri19, tri20, tri21, tri22, tri23, tri24]
+#
+#         for tet in tets:
+#             tet.translate(self.pos)
+#
+#         return tets
+#
 
 class QuarTet:
-    def __init__(self, n, device="cpu"):
-        self.curr_tetrahedrons = []
-        for x in range(n):
-            for y in range(n):
-                for z in range(n):
-                    pos = torch.tensor([x, y, z])
-                    tets = UnitCube(pos).divide_to_24()
-                    self.curr_tetrahedrons.extend(tets)
-
-        calculate_and_update_neighborhood(self.curr_tetrahedrons)
-        self.fill_neighbors()
-        self.merge_same_vertices()
-
-        for tet in self.curr_tetrahedrons:
-            tet.occupancy = tet.occupancy.to(device)
-            tet.features = tet.features.to(device)
-            tet.prev_features = tet.prev_features.to(device)
-            for i in range(4):
-                tet.vertices[i].loc = tet.vertices[i].loc.to(device)
-
-        for tet in self.curr_tetrahedrons:
-            tet.features.requires_grad_()
+    def __init__(self, path='../cube_0.05.tet', device='cpu'):
+        # self.curr_tetrahedrons = []
+        # for x in range(n):
+        #     for y in range(n):
+        #         for z in range(n):
+        #             pos = torch.tensor([x, y, z])
+        #             tets = UnitCube(pos).divide_to_24()
+        #             self.curr_tetrahedrons.extend(tets)
+        #
+        # calculate_and_update_neighborhood(self.curr_tetrahedrons)
+        # self.fill_neighbors()
+        # self.merge_same_vertices()
+        #
+        # for tet in self.curr_tetrahedrons:
+        #     tet.occupancy = tet.occupancy.to(device)
+        #     tet.features = tet.features.to(device)
+        #     tet.prev_features = tet.prev_features.to(device)
+        #     for i in range(4):
+        #         tet.vertices[i].loc = tet.vertices[i].loc.to(device)
+        #
+        # for tet in self.curr_tetrahedrons:
+        #     tet.features.requires_grad_()
+        self.curr_tetrahedrons = None
+        self.load(path, device)
 
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
@@ -266,7 +260,6 @@ class QuarTet:
             for v in tet.vertices:
                 new_vertices.append(all_vertices[v])
             tet.vertices = new_vertices
-
 
     def zero_grad(self):
         for tet in self.curr_tetrahedrons:
@@ -326,62 +319,53 @@ class QuarTet:
         return torch.stack(samples)
 
     def export(self, path):
+        """
+        TODO: change to .tet format
+        """
+
         with open(path, "w") as output_file:
             vertex_to_idx = {}
-            i = 0
+            n_ver = 0
+            to_write = ""
             for tet in self.curr_tetrahedrons:
                 for v in tet.vertices:
                     if v not in vertex_to_idx:
                         x, y, z = v.loc
-                        output_file.write(f"v {x} {y} {z}\n")
-                        vertex_to_idx[v] = i
-                        i += 1
+                        to_write += f"{x} {y} {z}\n"
+                        vertex_to_idx[v] = n_ver
+                        n_ver += 1
 
             for tet in self.curr_tetrahedrons:
                 if tet.occupancy > 0.5:
                     indices = [vertex_to_idx[v] for v in tet.vertices]
-                    output_file.write(f"f {indices[0]} {indices[1]} {indices[2]} {indices[3]}\n")
+                    to_write += f"{indices[0]} {indices[1]} {indices[2]} {indices[3]}\n"
+
+            output_file.write(f"tet {n_ver} {len(self.curr_tetrahedrons)}\n")
+            output_file.write(to_write)
 
     def load(self, path, device):
         self.curr_tetrahedrons = []
         vertices = []
         with open(path, "r") as input_file:
-            pos = input_file.tell()
             first_line = input_file.readline()
             first_line_split = first_line.split(' ')
-            if first_line_split[0] == 'tet':
-                print(f'Loading tet file\nReading {int(first_line_split[1])} vertices')
-                for i in range(int(first_line_split[1])):
-                    line = input_file.readline()
-                    coordinates = line.split(' ')
-                    vertices.append(Vertex(*[float(c) for c in coordinates]))
-                    if i % 100 == 0:
-                        print(f'Read {i} vertices')
-                print(f'Finished reading vertices\nReading {int(first_line_split[2])} tetrahedrons')
-                for i in range(int(first_line_split[2])):
-                    line = input_file.readline()
-                    vertex_indices = line.split(' ')
-                    self.curr_tetrahedrons.append(Tetrahedron([vertices[int(i)] for i in vertex_indices]))
-                    if i % 100 == 0:
-                        print(f'Read {i} tetrhedrons')
-            else:
-                print('Loading our file type')
-                input_file.seek(pos)
-                while True:
-                    line = next(input_file)
-                    if line[0] == 'f':
-                        break
-                    coordinates = line.split(' ')
-                    vertices.append(Vertex(*[float(c) for c in coordinates[1:]]))
-                try:
-                    while True:
-                        line = next(input_file)
-                        vertex_indices = line.split(' ')
-                        self.curr_tetrahedrons.append(Tetrahedron([vertices[int(i)] for i in vertex_indices[1:]]))
-                except StopIteration:
-                    pass
+            print(f'Loading tet file\nReading {int(first_line_split[1])} vertices')
+            for i in range(int(first_line_split[1])):
+                line = input_file.readline()
+                coordinates = line.split(' ')
+                vertices.append(Vertex(*[float(c) for c in coordinates]))
+                if i % 2000 == 0:
+                    print(f'Read {i} vertices')
+            print(f'Finished reading vertices\nReading {int(first_line_split[2])} tetrahedrons')
+            for i in range(int(first_line_split[2])):
+                line = input_file.readline()
+                vertex_indices = line.split(' ')
+                self.curr_tetrahedrons.append(Tetrahedron([vertices[int(i)] for i in vertex_indices]))
+                if i % 2000 == 0:
+                    print(f'Read {i} tetrhedrons')
+
         print('Calculating neighborhoods')
-        new_calculate_and_update_neighborhood(self.curr_tetrahedrons, vertices)
+        calculate_and_update_neighborhood(self.curr_tetrahedrons, vertices)
         print('Filling neighbors')
         self.fill_neighbors()
         print('Merge same vertices')
@@ -396,6 +380,60 @@ class QuarTet:
 
         for tet in self.curr_tetrahedrons:
             tet.features.requires_grad_()
+
+        # self.curr_tetrahedrons = []
+        # vertices = []
+        # with open(path, "r") as input_file:
+        #     pos = input_file.tell()
+        #     first_line = input_file.readline()
+        #     first_line_split = first_line.split(' ')
+        #     if first_line_split[0] == 'tet':
+        #         print(f'Loading tet file\nReading {int(first_line_split[1])} vertices')
+        #         for i in range(int(first_line_split[1])):
+        #             line = input_file.readline()
+        #             coordinates = line.split(' ')
+        #             vertices.append(Vertex(*[float(c) for c in coordinates]))
+        #             if i % 100 == 0:
+        #                 print(f'Read {i} vertices')
+        #         print(f'Finished reading vertices\nReading {int(first_line_split[2])} tetrahedrons')
+        #         for i in range(int(first_line_split[2])):
+        #             line = input_file.readline()
+        #             vertex_indices = line.split(' ')
+        #             self.curr_tetrahedrons.append(Tetrahedron([vertices[int(i)] for i in vertex_indices]))
+        #             if i % 100 == 0:
+        #                 print(f'Read {i} tetrhedrons')
+        #     else:
+        #         print('Loading our file type')
+        #         input_file.seek(pos)
+        #         while True:
+        #             line = next(input_file)
+        #             if line[0] == 'f':
+        #                 break
+        #             coordinates = line.split(' ')
+        #             vertices.append(Vertex(*[float(c) for c in coordinates[1:]]))
+        #         try:
+        #             while True:
+        #                 line = next(input_file)
+        #                 vertex_indices = line.split(' ')
+        #                 self.curr_tetrahedrons.append(Tetrahedron([vertices[int(i)] for i in vertex_indices[1:]]))
+        #         except StopIteration:
+        #             pass
+        # print('Calculating neighborhoods')
+        # calculate_and_update_neighborhood(self.curr_tetrahedrons, vertices)
+        # print('Filling neighbors')
+        # self.fill_neighbors()
+        # print('Merge same vertices')
+        # self.merge_same_vertices()
+        #
+        # for tet in self.curr_tetrahedrons:
+        #     tet.occupancy = tet.occupancy.to(device)
+        #     tet.features = tet.features.to(device)
+        #     tet.prev_features = tet.prev_features.to(device)
+        #     for i in range(4):
+        #         tet.vertices[i].loc = tet.vertices[i].loc.to(device)
+        #
+        # for tet in self.curr_tetrahedrons:
+        #     tet.features.requires_grad_()
 
     def reset(self):
         for tet in self.curr_tetrahedrons:
@@ -442,9 +480,8 @@ class QuarTet:
 
 if __name__ == '__main__':
     # a = QuarTet(2, 'cpu')
-    a = QuarTet(1, 'cpu')
+    a = QuarTet('../objects/cube_0.05.tet')
     print("Loading quartet file")
-    a.load("../cube.tet", "cpu")
 
-    print("Exportin quartet")
-    a.export('cube.obj')
+    print("Exporting quartet")
+    a.export('cube.tet')
