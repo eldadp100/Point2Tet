@@ -409,16 +409,22 @@ class QuarTet:
 if __name__ == '__main__':
     # a = QuarTet(2, 'cpu')
     a = QuarTet(2, 'cpu')
-    a.load("mother_cube.obj", "cpu")
+    # a.load("mother_cube.obj", "cpu")
+
     for tet in a:
-        print(len(tet.neighborhood))
+        tet.occupancy = 0
+    a.curr_tetrahedrons[7].occupancy = 1
+    a.curr_tetrahedrons[8].occupancy = 1
+
+    # for tet in a:
+    #     print(len(tet.neighborhood))
     # a.export("mother_cube.obj")
 
-    b = a.sample_disjoint_faces(4)
-    c = a.get_occupied_tets()
-    d = a.sample_point_cloud(100)
-    print(b)
-    print(c)
-    print(d)
+    # b = a.sample_disjoint_faces(4)
+    # c = a.get_occupied_tets()
+    # d = a.sample_point_cloud(100)
+    # print(b)
+    # print(c)
+    # print(d)
 
     a.export_mesh('try.obj')

@@ -57,19 +57,16 @@ class TetCNN_PP(nn.Module):
 
 
 class OurNet(nn.Module):
-    def __init__(self):
+    def __init__(self, ncf):
         super(OurNet, self).__init__()
 
-        ncf = [32, 64, 64, 32]  # last must be 3 because we iterate
-
+        # self.ncf = [32, 64, 64, 32]  # last must be 3 because we iterate
         self.embedding_at_start = MotherCubeConv(3, ncf[0])
         self.conv_net = TetCNN_PP(ncf)  # TetCNN++
         self.net_vertices_movements = nn.Linear(ncf[-1], 12)  # 3D movement
         self.net_occupancy = nn.Linear(ncf[-1], 1)  # Binary classifier - occupancy
 
-    def forward(self, mother_cube, iteration_number):
-        if iteration_number == 0:
-            self.embedding_at_start(mother_cube)
+    def forward(self, mother_cube):
         self.conv_net(mother_cube)
         for tet in mother_cube:
             tet_deltas = self.net_vertices_movements(tet.features).view(4, 3)
@@ -95,7 +92,7 @@ def get_scheduler(iters, optim):
 
 
 def init_net(opts, device):
-    net = OurNet().to(device)
+    net = OurNet(opts.ncf).to(device)
     optimizer = optim.Adam(net.parameters(), lr=opts.lr)
     scheduler = get_scheduler(opts.iterations, optimizer)
 

@@ -9,8 +9,12 @@ class Options:
     def parse_args(self):
         parser = argparse.ArgumentParser(description='Point2Mesh options')
         parser.add_argument('--name', type=str, default='./checkpoints/guitar', help='path to save results to')
-        parser.add_argument('--input-pc', type=str, default='./data/guitar.ply', help='input point cloud')
+        parser.add_argument('--input-pc', type=str, default='filled_pc2.ply', help='input point cloud')
         parser.add_argument('--continue_train', type=bool, default=False, help='continue train from the latest model')
+        parser.add_argument('--chamfer_sample_size', type=int, default=1000,
+                            help='number of points to sample for chamfer loss')
+        parser.add_argument('--sample_size', type=int, default=1000, help='number of points to sample from the pc')
+        parser.add_argument('--init_quartet_size', type=int, default=2, help='number of unit cubes in the initial quartet')
 
         # HYPER PARAMETERS - RECONSTRUCTION
         parser.add_argument('--torch-seed', type=int, metavar='N', default=5, help='torch random seed')
