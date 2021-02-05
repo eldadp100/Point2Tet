@@ -60,7 +60,6 @@ for i in range(opts.iterations):
     quartet.zero_grad()
     print(_loss)
     # scheduler.step()
-    print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
 
     if i != 0 and i % opts.save_freq == 0:
         os.rename(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt',
@@ -93,3 +92,4 @@ for i in range(opts.iterations):
             pass
 
     quartet.reset()
+    print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")

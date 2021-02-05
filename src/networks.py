@@ -60,8 +60,6 @@ class OurNet(nn.Module):
         super(OurNet, self).__init__()
 
         # ncf = [32, 64, 64, 32]  # last must be 3 because we iterate
-
-        self.embedding_at_start = MotherCubeConv(3, ncf[0])
         self.conv_net = TetCNN_PP(ncf)  # TetCNN++
         self.net_vertices_movements = nn.Linear(ncf[-1], 12)  # 3D movement
         self.net_occupancy = nn.Linear(ncf[-1], 1)  # Binary classifier - occupancy

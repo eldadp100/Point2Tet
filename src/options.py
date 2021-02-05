@@ -24,9 +24,7 @@ class Options:
         # HYPER PARAMETERS - NETWORK
         parser.add_argument('--lr', type=float, metavar='1eN', default=1.1e-4, help='learning rate')
         parser.add_argument('--res-blocks', type=int, metavar='N', default=3, help='')
-        parser.add_argument('--ncf', nargs='+', default=[3, 16, 32, 64, 128], type=int, help='convs to do')
+        parser.add_argument('--ncf', nargs='+', default=[3, 16, 32], type=int, help='convs to do')
         parser.add_argument('--pr', nargs='+', default=[0.3] * 5, type=float, help='pooling ratios to do')
-
-        # MULTI GPUS TRAINING
 
         self.args = parser.parse_args()
