@@ -46,7 +46,7 @@ class PointCloud:
 
 if __name__ == "__main__":
     device = 'cpu'
-    input_xyz, input_normals = _utils.read_pts("../pc.ply")
+    input_xyz, input_normals = _utils.read_pts("../objects/pc.ply")
     input_xyz = torch.Tensor(input_xyz).type(torch.FloatTensor).to(device)[None, :,
                 :]  # .type() also changes device somewhy on the server
     input_normals = torch.Tensor(input_normals).type(torch.FloatTensor).to(device)[None, :, :]
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     # pc.fill_iterior_of_point_cloud(method='steps')
     # pc.write_to_file("pc.obj")
     #
-    _mesh = mesh.Mesh('../init_mesh.obj')
+    _mesh = mesh.Mesh('../objects/init_mesh.obj')
     pc = PointCloud()
     pc.load_file('../pc.obj')
     pc.fill_iterior_of_point_cloud(method='mesh', mesh=_mesh)

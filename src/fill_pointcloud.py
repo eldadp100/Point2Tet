@@ -157,7 +157,7 @@ class FillPointCloud(pointcloud.PointCloud):
 # argument parsing
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Point Cloud Filling Arguments')
-    parser.add_argument('--input_pc', type=str, default='../filled_sphere.obj', help='.obj format')
+    parser.add_argument('--input_pc', type=str, default='../objects/filled_sphere.obj', help='.obj format')
     parser.add_argument('--input_mesh', type=str, default=None, help='optionality!!! .obj format')
     parser.add_argument('--output_path', type=str, default='default_name', help='output path')
     parser.add_argument('--method', type=str, default='default_name', help='steps (for convex) / mesh / winding number')

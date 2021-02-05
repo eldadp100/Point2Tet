@@ -480,7 +480,7 @@ class QuarTet:
 
 if __name__ == '__main__':
     # a = QuarTet(2, 'cpu')
-    a = QuarTet('../cube_0.05.tet')
+    a = QuarTet('../objects/cube_0.05.tet')
     print("Loading quartet file")
 
     print("Exporting quartet")
