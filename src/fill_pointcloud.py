@@ -1,4 +1,6 @@
 import argparse
+import time
+
 import torch
 import pointcloud
 import mesh
@@ -29,10 +31,11 @@ def face_ray_intersect(ray, face, face_plane):
 
         Then if lambda < 0 it's in the oposite side of the ray and we return False
     """
-    _lambda = (-d - np.dot(np.array([a, b, c]), np.array(ray[0]))) / (np.dot(np.array([a, b, c]), ray[1]))
-    if _lambda < 0:
-        return False
-    the_intersection_point = ray[0] + _lambda * ray[1]
+    _lambda = (-torch.matmul(ray[0], torch.tensor([a, b, c])) - d / torch.dot(torch.tensor(ray[1], dtype=torch.float64),
+                                                                              torch.tensor([a, b, c])))
+    falsers = _lambda < 0
+
+    the_intersection_points = _lambda.expand(3, _lambda.shape[0]).permute(1, 0) * ray[1].expand(_lambda.shape[0], 3)
     """
             check if the intersecting point in the face 
             by projecting the points on xy and check there if is inside
@@ -47,14 +50,14 @@ def face_ray_intersect(ray, face, face_plane):
             else:
                 m = (face[i][1] - face[j][1]) / (face[i][2] - face[j][2])
                 i_j_line = [m, -1, face[i][1] - m * face[i][2]]
+
+            new = torch.matmul(the_intersection_points[:, 1:3],
+                               torch.tensor([i_j_line[0], i_j_line[1]]).type_as(the_intersection_points))
+            new = (new + i_j_line[2]) > 0
             if curr is None:
-                curr = np.dot(np.array(i_j_line),
-                              np.array([the_intersection_point[2], the_intersection_point[1], 1.])) > 0
+                curr = new
             else:
-                new = np.dot(np.array(i_j_line),
-                             np.array([the_intersection_point[2], the_intersection_point[1], 1.])) > 0
-                if curr != new:
-                    return False
+                curr = curr * new
 
     else:
         """project on xy"""
@@ -66,14 +69,16 @@ def face_ray_intersect(ray, face, face_plane):
             else:
                 m = (face[i][1] - face[j][1]) / (face[i][0] - face[j][0])
                 i_j_line = [m, -1, face[i][1] - m * face[i][0]]
+
+            new = torch.matmul(the_intersection_points[:, 0:2],
+                               torch.tensor([i_j_line[0], i_j_line[1]]).type_as(the_intersection_points))
+            new = (new + i_j_line[2]) > 0
             if curr is None:
-                curr = np.dot(np.array(i_j_line),
-                              np.array([the_intersection_point[0], the_intersection_point[1], 1.])) > 0
+                curr = new
             else:
-                new = np.dot(np.array(i_j_line),
-                             np.array([the_intersection_point[0], the_intersection_point[1], 1.])) > 0
-                if curr != new:
-                    return False
+                curr = curr * new
+
+        return curr * falsers
 
 
 class FillPointCloud(pointcloud.PointCloud):
@@ -107,22 +112,33 @@ class FillPointCloud(pointcloud.PointCloud):
                 solution = np.linalg.solve(mat, b)
                 face_to_plane[tuple(map(tuple, face))] = solution
 
-            """
-                sample and filter points
-            """
-            sampled_points = np.random.rand(10000, 3)
-            filtered_point = []
-            for point in sampled_points:
-                direction = np.array([0., 0., 1.])
-                num_intersections = 0
-                for f in _mesh.faces:
-                    if face_ray_intersect((point, direction), f, face_to_plane[tuple(map(tuple, f))]):
-                        num_intersections += 1
+            sampled_points = torch.rand(N, 3, dtype=torch.float64)
+            direction = torch.tensor([0., 0., 1.])
+            number_intersections = torch.zeros(N)
+            for f in _mesh.faces:
+                a = face_ray_intersect((sampled_points, direction), f, face_to_plane[tuple(map(tuple, f))])
+                if a is not None:
+                    number_intersections += a
+            remaining_point_indices = number_intersections % 2 == 0
+            filtered_points = sampled_points[remaining_point_indices]
 
-                if num_intersections % 2 == 0:
-                    filtered_point.append(point)
-
-            self.points = filtered_point
+            # """
+            #     sample and filter points
+            # """
+            # sampled_points = np.random.rand(10000, 3)
+            # filtered_point = []
+            # for point in sampled_points:
+            #     s = time.time()
+            #     direction = np.array([0., 0., 1.])
+            #     num_intersections = 0
+            #     for f in _mesh.faces:
+            #         if face_ray_intersect((point, direction), f, face_to_plane[tuple(map(tuple, f))]):
+            #             num_intersections += 1
+            #
+            #     if num_intersections % 2 == 0:
+            #         filtered_point.append(point)
+            #     print(time.time() - s)
+            self.points = filtered_points
 
         elif method == 'winding number':
             """
@@ -154,22 +170,31 @@ class FillPointCloud(pointcloud.PointCloud):
             raise Exception("not valid fill interior method")
 
 
-# argument parsing
+# test
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Point Cloud Filling Arguments')
-    parser.add_argument('--input_pc', type=str, default='../objects/filled_sphere.obj', help='.obj format')
-    parser.add_argument('--input_mesh', type=str, default=None, help='optionality!!! .obj format')
-    parser.add_argument('--output_path', type=str, default='default_name', help='output path')
-    parser.add_argument('--method', type=str, default='default_name', help='steps (for convex) / mesh / winding number')
-    opts = parser.parse_args()
-    device = 'cpu'
-
-if __name__ == "__main__":
+    _mesh = mesh.Mesh('../objects/init_mesh.obj')
     pc = FillPointCloud()
-    pc.load_file(opts.input_pc)
-    _mesh = None
-    if opts.input_mesh is not None:
-        _mesh = mesh.Mesh(opts.input_mesh)
+    pc.load_file('../objects/pc.obj')
+    pc.fill_interior_of_point_cloud(method='mesh', _mesh=_mesh, N=10000)
+    pc.write_to_file("pc.obj")
 
-    pc.fill_interior_of_point_cloud(method=opts.method, _mesh=_mesh)
-    pc.write_to_file(opts.output_path)
+# # argument parsing
+# if __name__ == '__main__':
+#     parser = argparse.ArgumentParser(description='Point Cloud Filling Arguments')
+#     parser.add_argument('--input_pc', type=str, default='../objects/filled_sphere.obj', help='.obj format')
+#     parser.add_argument('--input_mesh', type=str, default=None, help='optionality!!! .obj format')
+#     parser.add_argument('--output_path', type=str, default='default_name', help='output path')
+#     parser.add_argument('--method', type=str, default='mesh', help='steps (for convex) / mesh / winding number')
+#     parser.add_argument('--mesh_N', type=int, default=10000, help='sampling points for mesh')
+#     opts = parser.parse_args()
+#     device = 'cpu'
+#
+# if __name__ == "__main__":
+#     pc = FillPointCloud()
+#     pc.load_file(opts.input_pc)
+#     _mesh = None
+#     if opts.input_mesh is not None:
+#         _mesh = mesh.Mesh(opts.input_mesh)
+#
+#     pc.fill_interior_of_point_cloud(method=opts.method, _mesh=_mesh, N=opts.mesh_N)
+#     pc.write_to_file(opts.output_path)
