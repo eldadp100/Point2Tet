@@ -1,7 +1,7 @@
 import torch
-import _utils
+import src._utils
 import numpy as np
-import mesh
+import src.mesh
 
 
 class PointCloud:

@@ -3,7 +3,7 @@ import time
 import numpy as np
 import torch
 import random
-from pointcloud import PointCloud
+from src.pointcloud import PointCloud
 import itertools
 
 
@@ -337,8 +337,8 @@ class QuarTet:
         for i, tet in enumerate(occupied_tets):
             for _ in range(points_count[i]):
                 samples.append(
-                    np.random.rand() + tet.vertices[0].loc + np.random.rand() * tet.vertices[1].loc + np.random.rand() *
-                    tet.vertices[2].loc + np.random.rand() * tet.vertices[3].loc)
+                    (np.random.rand() + tet.vertices[0].loc + np.random.rand() * tet.vertices[1].loc + np.random.rand() *
+                    tet.vertices[2].loc + np.random.rand() * tet.vertices[3].loc) / 4.)
 
         samples = random.choices(samples, k=pc_size)
         return torch.stack(samples)

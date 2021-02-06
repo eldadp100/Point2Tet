@@ -3,7 +3,7 @@ import time
 import torch
 import torch.nn as nn
 from torch import optim
-from quartet import QuarTet, Tetrahedron
+from src.quartet import QuarTet, Tetrahedron
 
 NEIGHBORHOOD_SIZE = 5
 
