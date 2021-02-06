@@ -41,7 +41,7 @@ class Tetrahedron:
                     c += 1
         return c == 3
 
-    def get_center(self):
+    def center(self):
         a = torch.stack([v.loc for v in self.vertices])
         loc = a.permute(1, 0).sum(dim=1) / 4.
         return Vertex(loc[0], loc[1], loc[2])
@@ -273,39 +273,28 @@ class QuarTet:
         return len(self.curr_tetrahedrons)
 
     def sample_point_cloud(self, pc_size):
-        occupied_tets = self.curr_tetrahedrons
-        volumes = [tet.volume() * tet.occupancy for tet in occupied_tets]
-        volumes_total = sum(volumes)
-
-        points_count = [np.int(np.ceil(((volume / volumes_total) * pc_size).item())) for volume in volumes]
-        # tmp_tets = [[tet] * points_count[i] for i, tet in enumerate(self.curr_tetrahedrons)]
-        # tets = []
-        # for tl in tmp_tets:
-        #     for t in tl:
-        #         tets.append(t)
-        # tets_vertices_x = torch.tensor([[v.loc[0] for v in tet.vertices] for tet in tets])
-        # tets_vertices_y = torch.tensor([[v.loc[1] for v in tet.vertices] for tet in tets], device='cpu')
-        # tets_vertices_z = torch.tensor([[v.loc[2] for v in tet.vertices] for tet in tets])
-        #
-        # w = torch.rand(len(tets), 4)  # random weights for the 4 vertices
-        # new_xs = torch.sum(w * tets_vertices_x, dim=1) / 4.
-        # new_ys = torch.sum(w * tets_vertices_y, dim=1) / 4.
-        # new_zs = torch.sum(w * tets_vertices_z, dim=1) / 4.
-        #
-        # samples = torch.stack([new_xs.squeeze(), new_ys.squeeze(), new_zs.squeeze()]).permute(1, 0)
-        # samples = random.choices(samples, k=pc_size)
-        # return torch.stack(samples)
 
         samples = []
-        for i, tet in enumerate(occupied_tets):
-            if points_count[i] <= 1:
-                continue
-            for _ in range(points_count[i]):
-                r = np.random.rand(4)
-                samples.append(sum([r[i] * tet.vertices[i].loc for i in range(4)]) / 4.)
+        weights = []
+        for tet in self.curr_tetrahedrons:
+            x = torch.rand(1, requires_grad=False)
+            if tet.occupancy > x or x < 0.1:  # explore rate of 0.1
+                samples.append(tet.center().loc)  # grad of 1
+                weights.append(tet.occupancy)
+        if len(samples) > pc_size:
+            samples_idx = np.random.choice(np.arange(pc_size), size=pc_size)
+            samples = torch.stack(samples)[samples_idx]
+            weights = torch.stack(weights)[samples_idx]
+        else:
+            padding_point = -2 * torch.ones(3, requires_grad=False)
+            padding_weight = torch.tensor(1., requires_grad=False, dtype=torch.float64)
+            for _ in range(pc_size - len(samples)):
+                samples.append(padding_point)
+                weights.append(padding_weight)
 
-        samples = random.choices(samples, k=pc_size)
-        return torch.stack(samples), volumes
+            samples = torch.stack(samples)
+            weights = torch.stack(weights)
+        return samples, weights
 
     def export(self, path):
         """
@@ -370,6 +359,24 @@ class QuarTet:
         for tet in self.curr_tetrahedrons:
             tet.features.requires_grad_()
 
+    def sample_point_cloud_2(self, pc_size):
+        occupied_tets = self.curr_tetrahedrons
+        volumes = [tet.volume() * tet.occupancy for tet in occupied_tets]
+        volumes_total = sum(volumes)
+
+        points_count = [np.int(np.ceil(((volume / volumes_total) * pc_size).item())) for volume in volumes]
+
+        samples = []
+        for i, tet in enumerate(occupied_tets):
+            if points_count[i] <= 1:
+                continue
+            for _ in range(points_count[i]):
+                r = np.random.rand(4)
+                samples.append(sum([r[i] * tet.vertices[i].loc for i in range(4)]) / 4.)
+
+        samples = random.choices(samples, k=pc_size)
+        return torch.stack(samples), volumes
+
     def reset(self):
         for tet in self.curr_tetrahedrons:
             tet.reset()
@@ -407,7 +414,8 @@ class QuarTet:
             f.write("\n".join(obj_file_str_faces))
 
     def export_point_cloud(self, path, N=10000):
-        points, _ = self.sample_point_cloud(N)
+        # points, _ = self.sample_point_cloud_2(N)
+        points, _ = self.sample_point_cloud_2(N)
         pc = PointCloud()
         pc.init_with_points(points)
         pc.write_to_file(path)

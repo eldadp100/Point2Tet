@@ -62,21 +62,27 @@ class OurNet(nn.Module):
         super(OurNet, self).__init__()
 
         # ncf = [32, 64, 64, 32]  # last must be 3 because we iterate
-        self.conv_net = TetCNN_PP(ncf)  # TetCNN++
-        self.net_vertices_movements = nn.Linear(ncf[-1], 3)  # 3D movement
-        self.net_occupancy = nn.Linear(ncf[-1], 1)  # Binary classifier - occupancy
+        # self.conv_net = TetCNN_PP(ncf)  # TetCNN++
+        self.net_vertices_movements = nn.Linear(ncf[0], 3)  # 3D movement
+        self.net_occupancy = nn.Sequential(
+            nn.Linear(ncf[0], 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1)
+        )  # Binary classifier - occupancy
 
     def forward(self, mother_cube):
         # 0.3-1 second
-        self.conv_net(mother_cube)
+        # self.conv_net(mother_cube)
 
         # 2.4 seconds  ---> 0.16 seconds
         tets_features = torch.stack([tet.features for tet in mother_cube])
         tets_movements = self.net_vertices_movements(tets_features).cpu()
         tets_occupancy = torch.tanh(self.net_occupancy(tets_features)) / 2 + 0.5
         # tets_occupancy += 0.5 - torch.sum(tets_occupancy) / len(mother_cube)
-        tets_occupancy = torch.max(tets_occupancy, torch.tensor([0.01], device=tets_occupancy.device).expand_as(tets_occupancy))
-        tets_occupancy = torch.min(tets_occupancy, torch.tensor([0.99], device=tets_occupancy.device).expand_as(tets_occupancy))
+        # tets_occupancy = torch.max(tets_occupancy, torch.tensor([0.01], device=tets_occupancy.device).expand_as(tets_occupancy))
+        # tets_occupancy = torch.min(tets_occupancy, torch.tensor([0.99], device=tets_occupancy.device).expand_as(tets_occupancy))
         tets_occupancy = tets_occupancy.cpu()
 
         for i, tet in enumerate(mother_cube):
