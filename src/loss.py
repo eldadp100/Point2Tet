@@ -1,3 +1,5 @@
+import time
+
 import torch
 from chamferdist import ChamferDistance
 
@@ -12,7 +14,8 @@ def chamfer_dist(src_pc, dst_pc):
 
 def chamfer_distance_quartet_to_point_cloud(quartet, pc, quartet_N_points=3000):
     quartet_pc = quartet.sample_point_cloud(quartet_N_points)
-    return chamfer_dist(quartet_pc.unsqueeze(1), pc.unsqueeze(1))
+    out = chamfer_dist(quartet_pc.unsqueeze(1), pc.unsqueeze(1))
+    return out
 #
 # from pytorch3d.loss import chamfer_distance
 # def chamfer_distance_quartet_to_point_cloud(quartet, pc):

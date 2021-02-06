@@ -1,3 +1,5 @@
+import time
+
 import torch
 import torch.nn as nn
 from torch import optim
@@ -60,25 +62,26 @@ class OurNet(nn.Module):
         super(OurNet, self).__init__()
 
         # ncf = [32, 64, 64, 32]  # last must be 3 because we iterate
-
-        self.embedding_at_start = MotherCubeConv(3, ncf[0])
         self.conv_net = TetCNN_PP(ncf)  # TetCNN++
-        self.net_vertices_movements = nn.Linear(ncf[-1], 12)  # 3D movement
+        self.net_vertices_movements = nn.Linear(ncf[-1], 3)  # 3D movement
         self.net_occupancy = nn.Linear(ncf[-1], 1)  # Binary classifier - occupancy
 
     def forward(self, mother_cube):
+        # 0.3-1 second
         self.conv_net(mother_cube)
-        for tet in mother_cube:
-            tet_deltas = self.net_vertices_movements(tet.features).view(4, 3)
-            tet.update_by_deltas(tet_deltas)
-            tet.occupancy = torch.tanh(self.net_occupancy(tet.features)) / 2 + 0.5
 
-        avg_occ = sum([t.occupancy for t in mother_cube]) / len(mother_cube)
-        offset = 0.5 - avg_occ.item()
-        for tet in mother_cube:
-            tet.occupancy += offset
-            tet.occupancy = max(tet.occupancy, torch.tensor([0.005], device=tet.occupancy.device))
+        # 2.4 seconds  ---> 0.16 seconds
+        tets_features = torch.stack([tet.features for tet in mother_cube])
+        tets_movements = self.net_vertices_movements(tets_features)
+        tets_occupancy = torch.tanh(self.net_occupancy(tets_features)) / 2 + 0.5
+        tets_occupancy += 0.5 - torch.sum(tets_occupancy) / len(mother_cube)
+        tets_occupancy = torch.max(tets_occupancy, torch.tensor([0.01], device=tets_occupancy.device).expand_as(tets_occupancy))
+        tets_occupancy = torch.min(tets_occupancy, torch.tensor([0.99], device=tets_occupancy.device).expand_as(tets_occupancy))
+        tets_occupancy = tets_occupancy.cpu()
 
+        for i, tet in enumerate(mother_cube):
+            tet.update_by_deltas(tets_movements[i])
+            tet.occupancy = tets_occupancy[i]
 
 def reset_params(model):
     for i, m in enumerate(model.modules()):
@@ -100,14 +103,19 @@ def get_scheduler(iters, optim):
 def init_net(opts, device):
     net = OurNet(opts.ncf).to(device)
     optimizer = optim.Adam(net.parameters(), lr=opts.lr)
-    scheduler = get_scheduler(opts.iterations, optimizer)
 
+    if opts.continue_train:
+        checkpoint = torch.load(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt')
+        net.load_state_dict(checkpoint['net'])
+        optimizer.load_state_dict(checkpoint['optim'])
+
+    scheduler = get_scheduler(opts.iterations, optimizer)
     return net, optimizer, scheduler
 
 
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    net = OurNet([3, 16, 32]).to(device)
+    net = OurNet([3, 16, 32])
     optimizer = optim.Adam(net.parameters(), lr=0.001)
 
     a = QuarTet(1, 'cpu')

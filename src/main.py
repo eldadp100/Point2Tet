@@ -12,7 +12,8 @@ import os
 options = Options()
 opts = options.args
 torch.manual_seed(opts.torch_seed)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 print('device: {}'.format(device))
 
 
@@ -41,30 +42,38 @@ print(f"finished creating quartet - {time.time() - start_creating_quartet} secon
 pc = PointCloud()
 pc.load_file(opts.input_filled_pc)
 pc.normalize()
-input_xyz = pc.points
-
-chamfer_sample_size = min(input_xyz.shape[0], opts.chamfer_samples)
-indices = np.random.randint(0, input_xyz.shape[0], chamfer_sample_size)
-input_xyz = input_xyz[indices]
+original_input_xyz = pc.points
 
 net, optimizer, scheduler = init_net(opts, device)
+
+print(f'opts.continue_train = {opts.continue_train}')
+print(f'opts.save_freq = {opts.save_freq}')
+
 for i in range(opts.iterations):
-    # TODO: Subdivide every opts.upsamp
     print(f"iteration {i} starts")
     iter_start_time = time.time()
+
+    # sample different points every iteration
+    chamfer_sample_size = min(original_input_xyz.shape[0], opts.chamfer_samples)
+    indices = np.random.randint(0, original_input_xyz.shape[0], chamfer_sample_size)
+    input_xyz = original_input_xyz[indices]
+
+    # TODO: Subdivide every opts.upsamp
     net(quartet)  # in place changes
+    s = time.time()
     _loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz, quartet_N_points=chamfer_sample_size)
+    print(time.time() - s)
     optimizer.zero_grad()
     _loss.backward()
     optimizer.step()
     quartet.zero_grad()
     print(_loss)
     # scheduler.step()
-    print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
 
     if i != 0 and i % opts.save_freq == 0:
-        os.rename(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt',
-                  f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_{i - opts.save_freq}.pt')
+        if os.path.isfile(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt'):
+            os.rename(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt',
+                      f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_{i - opts.save_freq}.pt')
 
         checkpoint_file_path = f"{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt"
         out_pc_file_path = f"{opts.checkpoint_folder}/{opts.name}/pc_{i}.obj"
@@ -91,5 +100,8 @@ for i in range(opts.iterations):
             quartet.export_mesh(out_mesh_file_path)
         except:
             pass
-
     quartet.reset()
+
+    print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
+
+print(_loss)
