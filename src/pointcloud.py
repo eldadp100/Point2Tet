@@ -9,7 +9,7 @@ class PointCloud:
         self.points = None
 
     def init_with_points(self, points):
-        self.points = torch.tensor(points)
+        self.points = points.clone().detach()
 
     def load_file(self, path):
         # .obj support only

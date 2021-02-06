@@ -3,7 +3,7 @@ import time
 import numpy as np
 import torch
 import random
-from src.pointcloud import PointCloud
+from pointcloud import PointCloud
 import itertools
 
 
@@ -16,7 +16,8 @@ class Tetrahedron:
         self.vertices = sorted(vertices)
         self.occupancy = torch.tensor([0.5])  # torch.rand(1)  # very small chance to all be 0
         self.neighborhood = set()
-        self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4.
+        # self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4.
+        self.features = torch.rand(30)
         self.prev_features = self.features
         self.sub_divided = None
         self.pooled = False
@@ -66,14 +67,6 @@ class Tetrahedron:
         return (a[0] - b[0],
                 a[1] - b[1],
                 a[2] - b[2])
-
-    # def volume(self):
-    #     p1, p2, p3, p4 = [v.loc for v in self.vertices]
-    #     return (abs(self.determinant_3x3((
-    #         self.subtract(p1, p2),
-    #         self.subtract(p2, p3),
-    #         self.subtract(p3, p4),
-    #     ))) / 6.0)
 
     def volume(self):
         p1, p2, p3, p4 = [v.loc for v in self.vertices]
@@ -136,9 +129,11 @@ class Face:
 class Vertex:
     def __init__(self, x, y, z):
         self.loc = torch.tensor([x, y, z], dtype=torch.float32)
+        self.on_boundary = x == 0 or x == 1 or y == 0 or y == 1 or z == 0 or z == 1
 
     def update_vertex(self, move_vector):
-        self.loc = self.loc + move_vector
+        if not self.on_boundary:
+            self.loc = torch.clip(self.loc + move_vector, 0., 1.)
 
     def get_xyz(self):
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
@@ -226,27 +221,6 @@ class Vertex:
 
 class QuarTet:
     def __init__(self, path='../cube_0.05.tet', device='cpu'):
-        # self.curr_tetrahedrons = []
-        # for x in range(n):
-        #     for y in range(n):
-        #         for z in range(n):
-        #             pos = torch.tensor([x, y, z])
-        #             tets = UnitCube(pos).divide_to_24()
-        #             self.curr_tetrahedrons.extend(tets)
-        #
-        # calculate_and_update_neighborhood(self.curr_tetrahedrons)
-        # self.fill_neighbors()
-        # self.merge_same_vertices()
-        #
-        # for tet in self.curr_tetrahedrons:
-        #     tet.occupancy = tet.occupancy.to(device)
-        #     tet.features = tet.features.to(device)
-        #     tet.prev_features = tet.prev_features.to(device)
-        #     for i in range(4):
-        #         tet.vertices[i].loc = tet.vertices[i].loc.to(device)
-        #
-        # for tet in self.curr_tetrahedrons:
-        #     tet.features.requires_grad_()
         self.curr_tetrahedrons = None
         self.load(path, device)
 
@@ -274,10 +248,6 @@ class QuarTet:
             for i in range(4):
                 tet.vertices[i].loc = tet.vertices[i].loc.detach().clone()
 
-    def init_occupancy_with_SDF(self, SDF):
-        # TODO: that will improve results
-        pass
-
     def sample_disjoint_faces(self, N):  # TODO: do it exact N
         faces = []
         visited_tets = set()
@@ -302,15 +272,8 @@ class QuarTet:
     def __len__(self):
         return len(self.curr_tetrahedrons)
 
-    def get_occupied_tets(self):
-        result = []
-        for tet in self:
-            if tet.occupancy > -1000:
-                result.append(tet)
-        return result
-
     def sample_point_cloud(self, pc_size):
-        occupied_tets = self.get_occupied_tets()
+        occupied_tets = self.curr_tetrahedrons
         volumes = [tet.volume() * tet.occupancy for tet in occupied_tets]
         volumes_total = sum(volumes)
 
@@ -335,13 +298,14 @@ class QuarTet:
 
         samples = []
         for i, tet in enumerate(occupied_tets):
+            if points_count[i] <= 1:
+                continue
             for _ in range(points_count[i]):
-                samples.append(
-                    (np.random.rand() + tet.vertices[0].loc + np.random.rand() * tet.vertices[1].loc + np.random.rand() *
-                    tet.vertices[2].loc + np.random.rand() * tet.vertices[3].loc) / 4.)
+                r = np.random.rand(4)
+                samples.append(sum([r[i] * tet.vertices[i].loc for i in range(4)]) / 4.)
 
         samples = random.choices(samples, k=pc_size)
-        return torch.stack(samples)
+        return torch.stack(samples), volumes
 
     def export(self, path):
         """
@@ -406,60 +370,6 @@ class QuarTet:
         for tet in self.curr_tetrahedrons:
             tet.features.requires_grad_()
 
-        # self.curr_tetrahedrons = []
-        # vertices = []
-        # with open(path, "r") as input_file:
-        #     pos = input_file.tell()
-        #     first_line = input_file.readline()
-        #     first_line_split = first_line.split(' ')
-        #     if first_line_split[0] == 'tet':
-        #         print(f'Loading tet file\nReading {int(first_line_split[1])} vertices')
-        #         for i in range(int(first_line_split[1])):
-        #             line = input_file.readline()
-        #             coordinates = line.split(' ')
-        #             vertices.append(Vertex(*[float(c) for c in coordinates]))
-        #             if i % 100 == 0:
-        #                 print(f'Read {i} vertices')
-        #         print(f'Finished reading vertices\nReading {int(first_line_split[2])} tetrahedrons')
-        #         for i in range(int(first_line_split[2])):
-        #             line = input_file.readline()
-        #             vertex_indices = line.split(' ')
-        #             self.curr_tetrahedrons.append(Tetrahedron([vertices[int(i)] for i in vertex_indices]))
-        #             if i % 100 == 0:
-        #                 print(f'Read {i} tetrhedrons')
-        #     else:
-        #         print('Loading our file type')
-        #         input_file.seek(pos)
-        #         while True:
-        #             line = next(input_file)
-        #             if line[0] == 'f':
-        #                 break
-        #             coordinates = line.split(' ')
-        #             vertices.append(Vertex(*[float(c) for c in coordinates[1:]]))
-        #         try:
-        #             while True:
-        #                 line = next(input_file)
-        #                 vertex_indices = line.split(' ')
-        #                 self.curr_tetrahedrons.append(Tetrahedron([vertices[int(i)] for i in vertex_indices[1:]]))
-        #         except StopIteration:
-        #             pass
-        # print('Calculating neighborhoods')
-        # calculate_and_update_neighborhood(self.curr_tetrahedrons, vertices)
-        # print('Filling neighbors')
-        # self.fill_neighbors()
-        # print('Merge same vertices')
-        # self.merge_same_vertices()
-        #
-        # for tet in self.curr_tetrahedrons:
-        #     tet.occupancy = tet.occupancy.to(device)
-        #     tet.features = tet.features.to(device)
-        #     tet.prev_features = tet.prev_features.to(device)
-        #     for i in range(4):
-        #         tet.vertices[i].loc = tet.vertices[i].loc.to(device)
-        #
-        # for tet in self.curr_tetrahedrons:
-        #     tet.features.requires_grad_()
-
     def reset(self):
         for tet in self.curr_tetrahedrons:
             tet.reset()
@@ -497,11 +407,10 @@ class QuarTet:
             f.write("\n".join(obj_file_str_faces))
 
     def export_point_cloud(self, path, N=10000):
-        points = self.sample_point_cloud(N)
+        points, _ = self.sample_point_cloud(N)
         pc = PointCloud()
         pc.init_with_points(points)
         pc.write_to_file(path)
-
 
 
 if __name__ == '__main__':
