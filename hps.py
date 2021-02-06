@@ -9,7 +9,7 @@ CONFIGURATIONS = [
     [
         ["--iterations"], [2],
         ["--lr"], [0.1, 0.01, 0.001, 0.0001, 0.00001],
-        ["--ncf"], [[3, 16, 32], [3, 16, 32, 32]]
+        ["--ncf"], [[30, 50, 64], [30, 50, 64, 64]]
     ]
 ]
 
@@ -75,7 +75,7 @@ def main():
         for index, config in enumerate(CONFIGURATIONS):
             print_config(index, csv_writer)
             cases = get_cases_for_config(config)
-            run_cases(cases)
+            run_cases(cases, csv_writer)
             
 
 if __name__ == "__main__":

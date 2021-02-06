@@ -3,7 +3,7 @@ import time
 import numpy as np
 import torch
 import random
-from pointcloud import PointCloud
+from src.pointcloud import PointCloud
 import itertools
 
 
@@ -133,7 +133,7 @@ class Vertex:
 
     def update_vertex(self, move_vector):
         if not self.on_boundary:
-            self.loc = torch.clip(self.loc + move_vector, 0., 1.)
+            self.loc = torch.clamp(self.loc + move_vector, 0., 1.)
 
     def get_xyz(self):
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()

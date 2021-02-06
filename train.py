@@ -1,7 +1,7 @@
 import shutil
 import torch
 from src.networks import init_net
-from src.loss import chamfer_distance_quartet_to_point_cloud
+from src.loss import loss
 from src.options import Options
 import time
 from src.quartet import QuarTet
@@ -11,8 +11,7 @@ import os
 
 def init_environment(opts):
     torch.manual_seed(opts.torch_seed)
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = torch.device('cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('device: {}'.format(device))
 
     if not os.path.exists(opts.checkpoint_folder):
@@ -42,10 +41,6 @@ def train(opts):
     original_input_xyz = pc.points
 
     net, optimizer, scheduler = init_net(opts, device)
-
-    print(f'opts.continue_train = {opts.continue_train}')
-    print(f'opts.save_freq = {opts.save_freq}')
-
     for i in range(opts.iterations):
         print(f"iteration {i} starts")
         iter_start_time = time.time()
@@ -58,7 +53,7 @@ def train(opts):
         # TODO: Subdivide every opts.upsamp
         net(quartet)  # in place changes
         s = time.time()
-        _loss = chamfer_distance_quartet_to_point_cloud(quartet, input_xyz, quartet_N_points=chamfer_sample_size)
+        _loss = loss(quartet, input_xyz, n=chamfer_sample_size)
         print(time.time() - s)
         optimizer.zero_grad()
         _loss.backward()
@@ -67,10 +62,10 @@ def train(opts):
         print(_loss)
         # scheduler.step()
 
-        if i != 0 and i % opts.save_freq == 0:
-            if os.path.isfile(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt'):
-                os.rename(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt',
-                        f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_{i - opts.save_freq}.pt')
+    if i != 0 and i % opts.save_freq == 0:
+        to_rename = f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt'
+        if os.path.exists(to_rename):
+            os.rename(to_rename, f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_{i - opts.save_freq}.pt')
 
             checkpoint_file_path = f"{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt"
             out_pc_file_path = f"{opts.checkpoint_folder}/{opts.name}/pc_{i}.obj"

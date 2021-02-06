@@ -12,9 +12,9 @@ class Options:
         parser.add_argument('--name', type=str, default='default_name', help='name in checkpoint folder to save results to')
         parser.add_argument('--continue_train', type=bool, default=False, help='continue train from latest checkpoint')
         parser.add_argument('--save_freq', type=int, default=20, help='save the model each {save_freq} iterations')
-        parser.add_argument('--checkpoint_folder', type=str, default="../checkpoints", help='')
-        parser.add_argument('--init_cube', type=str, default="../objects/cube_0.05.tet", help='.tet format')
-        parser.add_argument('--input_filled_pc', type=str, default='../objects/filled_sphere.obj', help='.obj format')
+        parser.add_argument('--checkpoint_folder', type=str, default="./checkpoints", help='')
+        parser.add_argument('--init_cube', type=str, default="./objects/cube_0.05.tet", help='.tet format')
+        parser.add_argument('--input_filled_pc', type=str, default='./objects/filled_sphere.obj', help='.obj format')
 
         # HYPER PARAMETERS - RECONSTRUCTION
         parser.add_argument('--torch-seed', type=int, metavar='N', default=5, help='torch random seed')

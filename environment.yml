@@ -1,0 +1,15 @@
+name: point2tet
+channels:
+  - pytorch
+  - defaults
+  - conda-forge
+  - fvcore
+  - pytorch3d
+dependencies:
+  - numpy
+  - pytorch
+  - torchvision
+  - fvcore
+  - pip
+  - pip:
+    - pytest==5.4.2
