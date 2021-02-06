@@ -12,10 +12,27 @@ def chamfer_dist(src_pc, dst_pc):
     return dist_forward
 
 
-def chamfer_distance_quartet_to_point_cloud(quartet, pc, quartet_N_points=3000):
-    quartet_pc = quartet.sample_point_cloud(quartet_N_points)
-    out = chamfer_dist(quartet_pc.unsqueeze(1), pc.unsqueeze(1))
-    return out
+def loss(quartet, pc, n=3000, lambda_1=1., lambda_2=0., lambda_3=0.):
+    assert lambda_1 + lambda_2 + lambda_3 <= 1.
+    lambda_4 = 1. - lambda_1 - lambda_2 - lambda_3
+    quartet_pc, volumes = quartet.sample_point_cloud(n)
+
+    # chamfer loss
+    loss_1 = chamfer_dist(quartet_pc.unsqueeze(1), pc.unsqueeze(1))
+
+    # tets volumes loss
+    avg_vols = sum(volumes) / len(volumes)
+    loss_2 = sum([(vol - avg_vols) ** 2 for vol in volumes]) / len(volumes)
+
+    # occupancy loss (no in between values)
+    occupancies = [tet.occupancy for tet in quartet.curr_tetrahedrons]
+    avg_occ = sum(occupancies) / len(occupancies)
+    loss_3 =  sum([min(occ, 1 - occ) for occ in occupancies]) / len(quartet)
+    loss_4 =  sum([(occ - avg_occ) ** 2 for occ in occupancies]) / len(occupancies)
+    print(loss_1.item(), loss_2.item(), loss_3.item(), loss_4.item())
+    return lambda_1 * loss_1 + lambda_2 * loss_2 + lambda_3 * loss_3 + lambda_4 * loss_4
+
+
 #
 # from pytorch3d.loss import chamfer_distance
 # def chamfer_distance_quartet_to_point_cloud(quartet, pc):
