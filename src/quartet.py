@@ -282,19 +282,21 @@ class QuarTet:
                 samples.append(tet.center().loc)  # grad of 1
                 weights.append(tet.occupancy)
         if len(samples) > pc_size:
+            padding_ratio = 0.
             samples_idx = np.random.choice(np.arange(pc_size), size=pc_size)
             samples = torch.stack(samples)[samples_idx]
             weights = torch.stack(weights)[samples_idx]
         else:
+            padding_ratio = (pc_size - len(samples)) /  pc_size
             padding_point = -2 * torch.ones(3, requires_grad=False)
-            padding_weight = torch.tensor(1., requires_grad=False, dtype=torch.float64)
+            padding_weight = torch.zeros(1, requires_grad=False, dtype=torch.float64) + 0.01
             for _ in range(pc_size - len(samples)):
                 samples.append(padding_point)
                 weights.append(padding_weight)
 
             samples = torch.stack(samples)
             weights = torch.stack(weights)
-        return samples, weights
+        return samples, weights, padding_ratio
 
     def export(self, path):
         """
@@ -361,7 +363,8 @@ class QuarTet:
 
     def sample_point_cloud_2(self, pc_size):
         occupied_tets = self.curr_tetrahedrons
-        volumes = [tet.volume() * tet.occupancy for tet in occupied_tets]
+        # volumes = [tet.volume() * tet.occupancy for tet in occupied_tets]
+        volumes = [tet.occupancy for tet in occupied_tets]
         volumes_total = sum(volumes)
 
         points_count = [np.int(np.ceil(((volume / volumes_total) * pc_size).item())) for volume in volumes]
@@ -413,9 +416,12 @@ class QuarTet:
             f.write("\n".join(obj_file_str_vert))
             f.write("\n".join(obj_file_str_faces))
 
-    def export_point_cloud(self, path, N=10000):
+    def export_point_cloud(self, path, n=2500):
         # points, _ = self.sample_point_cloud_2(N)
-        points, _ = self.sample_point_cloud_2(N)
+        s = time.time()
+        print("Start sampling pts")
+        points, _ = self.sample_point_cloud_2(n)
+        print(f"Done {time.time() - s}")
         pc = PointCloud()
         pc.init_with_points(points)
         pc.write_to_file(path)

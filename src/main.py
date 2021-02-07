@@ -147,9 +147,6 @@ def init_environment(opts):
     return checkpoint_folder
 
 
-
-
-
 init_environment(opts)
 
 start_creating_quartet = time.time()
@@ -164,15 +161,16 @@ pc.load_file(opts.input_filled_pc)
 pc.normalize()
 original_input_xyz = pc.points
 
+# sample different points every iteration
+chamfer_sample_size = min(original_input_xyz.shape[0], opts.chamfer_samples)
+indices = np.random.randint(0, original_input_xyz.shape[0], chamfer_sample_size)
+input_xyz = original_input_xyz[indices]
+
 net, optimizer, scheduler = init_net(opts, device)
 for i in range(opts.iterations):
     print(f"iteration {i} starts")
     iter_start_time = time.time()
 
-    # sample different points every iteration
-    chamfer_sample_size = min(original_input_xyz.shape[0], opts.chamfer_samples)
-    indices = np.random.randint(0, original_input_xyz.shape[0], chamfer_sample_size)
-    input_xyz = original_input_xyz[indices]
 
     # TODO: Subdivide every opts.upsamp
     net(quartet)  # in place changes
@@ -181,6 +179,7 @@ for i in range(opts.iterations):
     print(time.time() - s)
     optimizer.zero_grad()
     _loss.backward()
+    # net.net_occupancy._modules['0'].weight.grad
     optimizer.step()
     quartet.zero_grad()
     print(_loss)
@@ -203,7 +202,7 @@ for i in range(opts.iterations):
 
         torch.save(state_dict, checkpoint_file_path)
         try:
-            quartet.export_point_cloud(out_pc_file_path, 25000)
+            quartet.export_point_cloud(out_pc_file_path, 2500)
         except:
             pass
 
