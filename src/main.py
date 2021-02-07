@@ -139,10 +139,12 @@ def init_environment(opts):
         os.mkdir(opts.checkpoint_folder)
 
     checkpoint_folder = f"{opts.checkpoint_folder}/{opts.name}"
-    if os.path.exists(checkpoint_folder):
+    if os.path.exists(checkpoint_folder) and not opts.continue_train:
         shutil.rmtree(checkpoint_folder)
     time.sleep(0.1)
-    os.mkdir(checkpoint_folder)
+
+    if not os.path.exists(checkpoint_folder):
+        os.mkdir(checkpoint_folder)
 
     return checkpoint_folder
 

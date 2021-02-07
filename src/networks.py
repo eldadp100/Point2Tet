@@ -5,6 +5,8 @@ import torch.nn as nn
 from torch import optim
 from quartet import QuarTet, Tetrahedron
 
+import os
+
 NEIGHBORHOOD_SIZE = 5
 
 
@@ -110,6 +112,12 @@ def init_net(opts, device):
     net = OurNet(opts.ncf).to(device)
     optimizer = optim.Adam(net.parameters(), lr=opts.lr)
     scheduler = get_scheduler(opts.iterations, optimizer)
+
+    latest_checkpoint = f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt'
+    if opts.continue_train and os.path.exists(latest_checkpoint):
+        state_dict = torch.load(latest_checkpoint)
+        net.load_state_dict(state_dict['net'])
+        optimizer.load_state_dict(state_dict['optim'])
 
     return net, optimizer, scheduler
 
