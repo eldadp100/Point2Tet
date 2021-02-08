@@ -20,7 +20,7 @@ class Tetrahedron:
         # self.features = torch.rand(30)
         rand_vec = torch.rand(3) - 1
         self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4. + rand_vec
-        self.features = torch.cat([self.features, torch.rand(27)])
+        self.features = torch.cat([self.features, torch.rand(27, requires_grad=True)])
         self.prev_features = self.features
         self.sub_divided = None
         self.pooled = False
@@ -47,7 +47,7 @@ class Tetrahedron:
     def center(self):
         a = torch.stack([v.loc for v in self.vertices])
         loc = a.permute(1, 0).sum(dim=1) / 4.
-        return Vertex(loc[0], loc[1], loc[2])
+        return Vertex(*loc)
 
     def __hash__(self):
         return (self.vertices[0], self.vertices[1], self.vertices[2], self.vertices[3]).__hash__()
@@ -56,8 +56,8 @@ class Tetrahedron:
         return iter(self.vertices)
 
     def update_by_deltas(self, vertices_deltas):
-        for i, v in enumerate(self.vertices):
-            v.update_vertex(vertices_deltas)
+        for m, v in zip(vertices_deltas, self.vertices):
+            v.update_vertex(m)
 
     @staticmethod
     def determinant_3x3(m):
@@ -286,6 +286,7 @@ class QuarTet:
             x = torch.rand(1, requires_grad=False)
             if tet.occupancy > x or x < 0.1:  # explore rate of 0.1
                 samples.append(tet.center().loc)  # grad of 1
+                samples[-1].requires_grad = True
                 weights.append(tet.occupancy)
 
         if len(samples) > pc_size:

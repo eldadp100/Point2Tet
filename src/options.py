@@ -14,6 +14,7 @@ class Options:
         parser.add_argument('--checkpoint_folder', type=str, default="../checkpoints", help='')
         parser.add_argument('--init_cube', type=str, default="../objects/normalized_cube_0.05.tet", help='.tet format')
         parser.add_argument('--input_filled_pc', type=str, default='../objects/filled_sphere.obj', help='.obj format')
+        parser.add_argument('--iteration_number', type=int, default=-1, help='the number of iteration to continue from in case of using --continue_train')
 
         # HYPER PARAMETERS - RECONSTRUCTION
         parser.add_argument('--torch-seed', type=int, metavar='N', default=5, help='torch random seed')
