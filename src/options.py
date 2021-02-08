@@ -13,7 +13,7 @@ class Options:
         parser.add_argument('--save_freq', type=int, default=100, help='save the model each {save_freq} iterations')
         parser.add_argument('--checkpoint_folder', type=str, default="../checkpoints", help='')
         parser.add_argument('--init_cube', type=str, default="../objects/cube_0.05.tet", help='.tet format')
-        parser.add_argument('--input_filled_pc', type=str, default='../objects/filled_pc.obj', help='.obj format')
+        parser.add_argument('--input_filled_pc', type=str, default='../objects/filled_sphere.obj', help='.obj format')
 
         # HYPER PARAMETERS - RECONSTRUCTION
         parser.add_argument('--torch-seed', type=int, metavar='N', default=5, help='torch random seed')

@@ -17,7 +17,10 @@ class Tetrahedron:
         self.occupancy = torch.tensor([0.5])  # torch.rand(1)  # very small chance to all be 0
         self.neighborhood = set()
         # self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4.
-        self.features = torch.rand(30)
+        # self.features = torch.rand(30)
+        rand_vec = torch.rand(3) - 1
+        self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4. + rand_vec
+        self.features = torch.cat([self.features, torch.rand(29)])
         self.prev_features = self.features
         self.sub_divided = None
         self.pooled = False
@@ -125,6 +128,9 @@ class Face:
     def get_tets(self):
         return self.tet1, self.tet2
 
+    def __iter__(self):
+        return iter(self.face_coords)
+
 
 class Vertex:
     def __init__(self, x, y, z):
@@ -222,6 +228,7 @@ class Vertex:
 class QuarTet:
     def __init__(self, path='../cube_0.05.tet', device='cpu'):
         self.curr_tetrahedrons = None
+        self.vertices = None
         self.load(path, device)
 
     def fill_neighbors(self):
@@ -273,7 +280,6 @@ class QuarTet:
         return len(self.curr_tetrahedrons)
 
     def sample_point_cloud(self, pc_size):
-
         samples = []
         weights = []
         for tet in self.curr_tetrahedrons:
@@ -281,13 +287,14 @@ class QuarTet:
             if tet.occupancy > x or x < 0.1:  # explore rate of 0.1
                 samples.append(tet.center().loc)  # grad of 1
                 weights.append(tet.occupancy)
+
         if len(samples) > pc_size:
             padding_ratio = 0.
             samples_idx = np.random.choice(np.arange(pc_size), size=pc_size)
             samples = torch.stack(samples)[samples_idx]
             weights = torch.stack(weights)[samples_idx]
         else:
-            padding_ratio = (pc_size - len(samples)) /  pc_size
+            padding_ratio = (pc_size - len(samples)) / pc_size
             padding_point = -2 * torch.ones(3, requires_grad=False)
             padding_weight = torch.zeros(1, requires_grad=False, dtype=torch.float64) + 0.01
             for _ in range(pc_size - len(samples)):
@@ -334,14 +341,16 @@ class QuarTet:
                 line = input_file.readline()
                 coordinates = line.split(' ')
                 vertices.append(Vertex(*[float(c) for c in coordinates]))
-                if i % 2000 == 0:
+                if i % 2000 == 0 and i > 0:
                     print(f'Read {i} vertices')
+
+            self.vertices = vertices
             print(f'Finished reading vertices\nReading {int(first_line_split[2])} tetrahedrons')
             for i in range(int(first_line_split[2])):
                 line = input_file.readline()
                 vertex_indices = line.split(' ')
                 self.curr_tetrahedrons.append(Tetrahedron([vertices[int(i)] for i in vertex_indices]))
-                if i % 2000 == 0:
+                if i % 2000 == 0 and i > 0:
                     print(f'Read {i} tetrhedrons')
 
         print('Calculating neighborhoods')
@@ -393,7 +402,7 @@ class QuarTet:
                 if (tet.occupancy > 0.5) ^ (nei.occupancy > 0.5):
                     face = Face(tet, nei)
                     faces.append(face)
-            print(tet.occupancy)
+            # print(tet.occupancy)
         return faces
 
     def export_mesh(self, path):
