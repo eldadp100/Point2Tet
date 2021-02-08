@@ -206,7 +206,7 @@ for i in range(opts.iterations):
         try:
             quartet.export_point_cloud(out_pc_file_path, 2500)
         except:
-            pass
+            print("Error while trying to export point cloud")
 
         try:
             quartet.export(out_quartet_file_path)

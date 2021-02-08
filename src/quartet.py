@@ -20,7 +20,7 @@ class Tetrahedron:
         # self.features = torch.rand(30)
         rand_vec = torch.rand(3) - 1
         self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4. + rand_vec
-        self.features = torch.cat([self.features, torch.rand(29)])
+        self.features = torch.cat([self.features, torch.rand(27)])
         self.prev_features = self.features
         self.sub_divided = None
         self.pooled = False

@@ -26,24 +26,27 @@ def read_pts(pts_file):
     return np.array(xyz, dtype=np.float32), np.array(normals, dtype=np.float32)
 
 
-def load_obj(file):
+def load_obj(file, normalize=False):
     vs, faces = [], []
-    f = open(file)
-    for line in f:
-        line = line.strip()
-        splitted_line = line.split()
-        if not splitted_line:
-            continue
-        elif splitted_line[0] == 'v':
-            vs.append([float(v) for v in splitted_line[1:4]])
-        elif splitted_line[0] == 'f':
-            face_vertex_ids = [int(c.split('/')[0]) for c in splitted_line[1:]]
-            assert len(face_vertex_ids) == 3
-            face_vertex_ids = [(ind - 1) if (ind >= 0) else (len(vs) + ind)
-                               for ind in face_vertex_ids]
-            faces.append(face_vertex_ids)
-    f.close()
+    with open(file) as f:
+        for line in f:
+            line = line.strip()
+            splitted_line = line.split()
+            if not splitted_line:
+                continue
+            elif splitted_line[0] == 'v':
+                vs.append([float(v) for v in splitted_line[1:4]])
+            elif splitted_line[0] == 'f':
+                face_vertex_ids = [int(c.split('/')[0]) for c in splitted_line[1:]]
+                assert len(face_vertex_ids) == 3
+                face_vertex_ids = [(ind - 1) if (ind >= 0) else (len(vs) + ind)
+                                   for ind in face_vertex_ids]
+                faces.append(face_vertex_ids)
     vs = np.asarray(vs)
+    if normalize:
+        vs -= vs.mean(axis=0)
+        vs += np.abs(vs.min(axis=0))
+        vs /= vs.max(axis=0)
     faces = np.asarray(faces, dtype=int)
     assert np.logical_and(faces >= 0, faces < len(vs)).all()
     return vs, faces
@@ -64,3 +67,8 @@ def export(file, vs, faces, vn=None, color=None):
 
 def random_file_name(ext, prefix='temp'):
     return f'{prefix}{uuid.uuid4()}.{ext}'
+
+
+if __name__ == '__main__':
+    vs, faces = load_obj('../objects/cube.obj', normalize=True)
+    export('../objects/normalized_cube.obj', vs, faces)
