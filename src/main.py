@@ -127,6 +127,10 @@ from pointcloud import PointCloud
 import numpy as np
 import os
 
+import matplotlib.pyplot as plt
+
+import playground.bad_grad_viz as grad_vis
+
 options = Options()
 opts = options.args
 torch.manual_seed(opts.torch_seed)
@@ -139,12 +143,31 @@ def init_environment(opts):
         os.mkdir(opts.checkpoint_folder)
 
     checkpoint_folder = f"{opts.checkpoint_folder}/{opts.name}"
-    if os.path.exists(checkpoint_folder):
+    if os.path.exists(checkpoint_folder) and not opts.continue_train:
         shutil.rmtree(checkpoint_folder)
     time.sleep(0.1)
-    os.mkdir(checkpoint_folder)
+
+    if not os.path.exists(checkpoint_folder):
+        os.mkdir(checkpoint_folder)
 
     return checkpoint_folder
+
+
+def plot_grad_flow(named_parameters):
+    ave_grads = []
+    layers = []
+    for n, p in named_parameters:
+        if p.requires_grad and ("bias" not in n):
+            layers.append(n)
+            ave_grads.append(p.grad.abs().mean())
+    plt.plot(ave_grads, alpha=0.3, color="b")
+    plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k" )
+    plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
+    plt.xlim(xmin=0, xmax=len(ave_grads))
+    plt.xlabel("Layers")
+    plt.ylabel("average gradient")
+    plt.title("Gradient flow")
+    plt.grid(True)
 
 
 init_environment(opts)
@@ -167,7 +190,17 @@ indices = np.random.randint(0, original_input_xyz.shape[0], chamfer_sample_size)
 input_xyz = original_input_xyz[indices]
 
 net, optimizer, scheduler = init_net(opts, device)
-for i in range(opts.iterations):
+
+# range_init = opts.iteration_number if opts.continue_train else 1
+range_init = 1
+if opts.continue_train:
+    if opts.iteration_number == -1:
+        with open(f"{opts.checkpoint_folder}/{opts.name}/iter_num.txt") as file:
+            range_init = int(file.readline().strip()) + 1
+    else:
+        range_init = opts.iteration_number
+
+for i in range(range_init, opts.iterations + 1):
     print(f"iteration {i} starts")
     iter_start_time = time.time()
 
@@ -176,9 +209,39 @@ for i in range(opts.iterations):
     net(quartet)  # in place changes
     s = time.time()
     _loss = loss.loss(quartet, input_xyz, n=chamfer_sample_size)
+
+    ######################################################
+    print('occupancy gradient:')
+    grad = net.net_occupancy[0].weight.grad
+    if grad is not None:
+        print(f'max = {grad.max()}, min = {grad.min()}')
+    else:
+        print('None')
+    ######################################################
+    print('movement gradient:')
+    grad = net.net_vertices_movements.weight.grad
+    if grad is not None:
+        print(f'max = {grad.max()}, min = {grad.min()}')
+    else:
+        print('None')
+    ######################################################
+
     print(time.time() - s)
     optimizer.zero_grad()
+
+    ########################
+    # get_dot = grad_vis.register_hooks(_loss)
+    ########################
+
     _loss.backward()
+
+    # plot_grad_flow(net.named_parameters())
+
+    ########################
+    # dot = get_dot()
+    # dot.save('tmp.dot')
+    ########################
+
     # net.net_occupancy._modules['0'].weight.grad
     optimizer.step()
     quartet.zero_grad()
@@ -195,6 +258,10 @@ for i in range(opts.iterations):
         out_quartet_file_path = f"{opts.checkpoint_folder}/{opts.name}/quartet_{i}.tet"
         out_mesh_file_path = f"{opts.checkpoint_folder}/{opts.name}/mesh_{i}.obj"
 
+        if os.path.exists(f"{opts.checkpoint_folder}/{opts.name}/iter_num.txt"):
+            with open(f"{opts.checkpoint_folder}/{opts.name}/iter_num.txt") as iter_num_file:
+                iter_num_file.write(i)
+
         state_dict = {
             "net": net.state_dict(),
             "optim": optimizer.state_dict()
@@ -204,7 +271,7 @@ for i in range(opts.iterations):
         try:
             quartet.export_point_cloud(out_pc_file_path, 2500)
         except:
-            pass
+            print("Error while trying to export point cloud")
 
         try:
             quartet.export(out_quartet_file_path)
@@ -215,8 +282,12 @@ for i in range(opts.iterations):
             quartet.export_mesh(out_mesh_file_path)
         except:
             pass
+
     quartet.reset()
 
     print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
 
 print(_loss)
+
+
+

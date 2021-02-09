@@ -7,33 +7,10 @@ import numpy as np
 import os
 import uuid
 import glob
-
-
-def load_obj(file):
-    vs, faces = [], []
-    f = open(file)
-    for line in f:
-        line = line.strip()
-        splitted_line = line.split()
-        if not splitted_line:
-            continue
-        elif splitted_line[0] == 'v':
-            vs.append([float(v) for v in splitted_line[1:4]])
-        elif splitted_line[0] == 'f':
-            face_vertex_ids = [int(c.split('/')[0]) for c in splitted_line[1:]]
-            assert len(face_vertex_ids) == 3
-            face_vertex_ids = [(ind - 1) if (ind >= 0) else (len(vs) + ind)
-                               for ind in face_vertex_ids]
-            faces.append(face_vertex_ids)
-    f.close()
-    vs = np.asarray(vs)
-    faces = np.asarray(faces, dtype=int)
-    assert np.logical_and(faces >= 0, faces < len(vs)).all()
-    return vs, faces
+from _utils import load_obj
 
 
 class Mesh:
-
     def __init__(self, file):
         self.vs, self.faces = load_obj(file)
         faces_list = []

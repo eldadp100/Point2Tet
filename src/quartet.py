@@ -17,7 +17,10 @@ class Tetrahedron:
         self.occupancy = torch.tensor([0.5])  # torch.rand(1)  # very small chance to all be 0
         self.neighborhood = set()
         # self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4.
-        self.features = torch.rand(30)
+        # self.features = torch.rand(30)
+        rand_vec = torch.rand(3) - 1
+        self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4. + rand_vec
+        self.features = torch.cat([self.features, torch.rand(27, requires_grad=True)])
         self.prev_features = self.features
         self.sub_divided = None
         self.pooled = False
@@ -26,7 +29,26 @@ class Tetrahedron:
         self.init_features = self.features.clone()
         self.init_vertices = [v for v in self.vertices]
         self.init_occupancy = self.occupancy.clone()
+    
+    def sample_points(self, n):
+        a, b, c, d = [v.loc for v in self.vertices]
+        t1 = b - a
+        t2 = c - a
+        t3 = d - a
 
+        q_lst = []
+
+        while len(q_lst) < n:
+            # q = np.random.rand(3)
+            # if np.sum(q) <= 1:
+            #     q_lst.append(q)
+            q = np.random.rand(4)
+            q[1:] /= np.sum(q[1:])
+            q *= q[0]
+            q_lst.append(q[1:])
+
+        return [a + q[0] * t1 + q[1] * t2 + q[2] * t3 for q in q_lst]
+    
     def add_neighbor(self, neighbor):
         self.neighborhood.add(neighbor)
 
@@ -44,7 +66,7 @@ class Tetrahedron:
     def center(self):
         a = torch.stack([v.loc for v in self.vertices])
         loc = a.permute(1, 0).sum(dim=1) / 4.
-        return Vertex(loc[0], loc[1], loc[2])
+        return Vertex(*loc)
 
     def __hash__(self):
         return (self.vertices[0], self.vertices[1], self.vertices[2], self.vertices[3]).__hash__()
@@ -53,8 +75,8 @@ class Tetrahedron:
         return iter(self.vertices)
 
     def update_by_deltas(self, vertices_deltas):
-        for i, v in enumerate(self.vertices):
-            v.update_vertex(vertices_deltas)
+        for m, v in zip(vertices_deltas, self.vertices):
+            v.update_vertex(m)
 
     @staticmethod
     def determinant_3x3(m):
@@ -125,6 +147,9 @@ class Face:
     def get_tets(self):
         return self.tet1, self.tet2
 
+    def __iter__(self):
+        return iter(self.face_coords)
+
 
 class Vertex:
     def __init__(self, x, y, z):
@@ -169,59 +194,11 @@ class Vertex:
         return not (self >= other)
 
 
-# class UnitCube:
-#     def __init__(self, pos):
-#         self.pos = pos
-#
-#     def divide_to_24(self):
-#         # (000) (010) (001) (011) --> (0 0.5 0.5)
-#         tri1 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 1, 0), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-#         tri2 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 0, 1), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-#         tri3 = Tetrahedron([Vertex(0, 1, 1), Vertex(0, 1, 0), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-#         tri4 = Tetrahedron([Vertex(0, 1, 1), Vertex(0, 0, 1), Vertex(0, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-#
-#         # (000) (100) (010) (110) --> (0.5 0.5 0)
-#         tri5 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
-#         tri6 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 1, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
-#         tri7 = Tetrahedron([Vertex(1, 1, 0), Vertex(1, 0, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
-#         tri8 = Tetrahedron([Vertex(1, 1, 0), Vertex(0, 1, 0), Vertex(0.5, 0.5, 0), Vertex(0.5, 0.5, 0.5)])
-#
-#         # (000) (100) (001) (101) --> (0.5 0 0.5)
-#         tri9 = Tetrahedron([Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
-#         tri10 = Tetrahedron([Vertex(0, 0, 0), Vertex(0, 0, 1), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
-#         tri11 = Tetrahedron([Vertex(1, 0, 1), Vertex(1, 0, 0), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
-#         tri12 = Tetrahedron([Vertex(1, 0, 1), Vertex(0, 0, 1), Vertex(0.5, 0, 0.5), Vertex(0.5, 0.5, 0.5)])
-#
-#         # (111) (011) (110) (010) --> (1 0.5 0.5)
-#         tri13 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 1, 0), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
-#         tri14 = Tetrahedron([Vertex(1, 1, 1), Vertex(0, 1, 1), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
-#         tri15 = Tetrahedron([Vertex(0, 1, 0), Vertex(1, 1, 0), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
-#         tri16 = Tetrahedron([Vertex(0, 1, 0), Vertex(0, 1, 1), Vertex(0.5, 1, 0.5), Vertex(0.5, 0.5, 0.5)])
-#
-#         # (111) (101) (110) (100) --> (0.5 0.5 1)
-#         tri17 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 0, 1), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-#         tri18 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 1, 0), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-#         tri19 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 0, 1), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-#         tri20 = Tetrahedron([Vertex(1, 0, 0), Vertex(1, 1, 0), Vertex(1, 0.5, 0.5), Vertex(0.5, 0.5, 0.5)])
-#
-#         # (111) (101) (011) (001) --> (0.5 1 0.5)
-#         tri21 = Tetrahedron([Vertex(1, 1, 1), Vertex(1, 0, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
-#         tri22 = Tetrahedron([Vertex(1, 1, 1), Vertex(0, 1, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
-#         tri23 = Tetrahedron([Vertex(0, 0, 1), Vertex(1, 0, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
-#         tri24 = Tetrahedron([Vertex(0, 0, 1), Vertex(0, 1, 1), Vertex(0.5, 0.5, 1), Vertex(0.5, 0.5, 0.5)])
-#
-#         tets = [tri1, tri2, tri3, tri4, tri5, tri6, tri7, tri8, tri9, tri10, tri11, tri12, tri13, tri14, tri15,
-#                 tri16, tri17, tri18, tri19, tri20, tri21, tri22, tri23, tri24]
-#
-#         for tet in tets:
-#             tet.translate(self.pos)
-#
-#         return tets
-#
 
 class QuarTet:
     def __init__(self, path='../cube_0.05.tet', device='cpu'):
         self.curr_tetrahedrons = None
+        self.vertices = None
         self.load(path, device)
 
     def fill_neighbors(self):
@@ -274,29 +251,66 @@ class QuarTet:
 
     def sample_point_cloud(self, pc_size):
 
-        samples = []
-        weights = []
+        samples_weights = []
         for tet in self.curr_tetrahedrons:
-            x = torch.rand(1, requires_grad=False)
-            if tet.occupancy > x or x < 0.1:  # explore rate of 0.1
-                samples.append(tet.center().loc)  # grad of 1
-                weights.append(tet.occupancy)
-        if len(samples) > pc_size:
-            padding_ratio = 0.
-            samples_idx = np.random.choice(np.arange(pc_size), size=pc_size)
-            samples = torch.stack(samples)[samples_idx]
-            weights = torch.stack(weights)[samples_idx]
-        else:
-            padding_ratio = (pc_size - len(samples)) /  pc_size
-            padding_point = -2 * torch.ones(3, requires_grad=False)
-            padding_weight = torch.zeros(1, requires_grad=False, dtype=torch.float64) + 0.01
-            for _ in range(pc_size - len(samples)):
-                samples.append(padding_point)
-                weights.append(padding_weight)
+            samples_weights.append((tet.center().loc, tet.occupancy))  # grad of 1
+        samples_weights = random.choices(samples_weights, k=pc_size)
+        samples = torch.stack([x[0] for x in samples_weights])
+        weights = torch.stack([x[1] for x in samples_weights])
+        return samples, weights
 
-            samples = torch.stack(samples)
-            weights = torch.stack(weights)
-        return samples, weights, padding_ratio
+    def sample_point_cloud_2(self, pc_size):
+        occupied_tets = self.curr_tetrahedrons
+        volumes = [tet.volume() * tet.occupancy for tet in occupied_tets]
+        volumes_total = sum(volumes)
+
+        points_count = [np.int(np.ceil(((volume / volumes_total) * pc_size).item())) for volume in volumes]
+
+        samples = []
+        for i, tet in enumerate(occupied_tets):
+            samples.extend(tet.sample_points(points_count[i]))
+
+        samples = random.choices(samples, k=pc_size)
+        return torch.stack(samples)
+
+    def sample_point_cloud_3(self, pc_size):
+        occupied_tets = self.curr_tetrahedrons
+        volumes = [tet.volume() * tet.occupancy for tet in occupied_tets]
+        # volumes = [tet.occupancy for tet in occupied_tets]
+        volumes_total = sum(volumes)
+
+        points_count = [np.int(np.ceil(((volume / volumes_total) * pc_size).item())) for volume in volumes]
+        # points_count = [5 for volume in volumes]
+
+        samples = []
+        for i, tet in enumerate(occupied_tets):
+            # if points_count[i] <= 1:
+            #     continue
+            for _ in range(points_count[i]):
+                r = np.random.rand(4)
+                r /= np.sum(r)
+                samples.append(sum([r[i] * tet.vertices[i].loc for i in range(4)]))
+
+        # if len(samples) == 0:
+        #     return torch.rand(pc_size, 3)
+        samples = random.choices(samples, k=pc_size)
+        # return torch.stack(samples), volumes
+        return torch.stack(samples)
+
+    def sample_point_cloud_4(self, pc_size):
+        occupied_tets = self.curr_tetrahedrons
+        # volumes = [tet.volume() * tet.occupancy for tet in occupied_tets]
+        volumes = [(tet.occupancy > 0.5) + 0.01 for tet in occupied_tets]
+        volumes_total = sum(volumes)
+
+        points_count = [np.int(np.ceil(((volume / volumes_total) * pc_size).item())) for volume in volumes]
+
+        samples = []
+        for i, tet in enumerate(occupied_tets):
+            little_qube = (torch.rand(points_count[i], 3) - 0.5) / 50
+            little_qube = little_qube + tet.center().loc.expand_as(little_qube)
+            samples.append(little_qube)
+        return torch.cat(samples)
 
     def export(self, path):
         """
@@ -334,14 +348,16 @@ class QuarTet:
                 line = input_file.readline()
                 coordinates = line.split(' ')
                 vertices.append(Vertex(*[float(c) for c in coordinates]))
-                if i % 2000 == 0:
+                if i % 2000 == 0 and i > 0:
                     print(f'Read {i} vertices')
+
+            self.vertices = vertices
             print(f'Finished reading vertices\nReading {int(first_line_split[2])} tetrahedrons')
             for i in range(int(first_line_split[2])):
                 line = input_file.readline()
                 vertex_indices = line.split(' ')
                 self.curr_tetrahedrons.append(Tetrahedron([vertices[int(i)] for i in vertex_indices]))
-                if i % 2000 == 0:
+                if i % 2000 == 0 and i > 0:
                     print(f'Read {i} tetrhedrons')
 
         print('Calculating neighborhoods')
@@ -361,24 +377,6 @@ class QuarTet:
         for tet in self.curr_tetrahedrons:
             tet.features.requires_grad_()
 
-    def sample_point_cloud_2(self, pc_size):
-        occupied_tets = self.curr_tetrahedrons
-        # volumes = [tet.volume() * tet.occupancy for tet in occupied_tets]
-        volumes = [tet.occupancy for tet in occupied_tets]
-        volumes_total = sum(volumes)
-
-        points_count = [np.int(np.ceil(((volume / volumes_total) * pc_size).item())) for volume in volumes]
-
-        samples = []
-        for i, tet in enumerate(occupied_tets):
-            if points_count[i] <= 1:
-                continue
-            for _ in range(points_count[i]):
-                r = np.random.rand(4)
-                samples.append(sum([r[i] * tet.vertices[i].loc for i in range(4)]) / 4.)
-
-        samples = random.choices(samples, k=pc_size)
-        return torch.stack(samples), volumes
 
     def reset(self):
         for tet in self.curr_tetrahedrons:
@@ -393,7 +391,7 @@ class QuarTet:
                 if (tet.occupancy > 0.5) ^ (nei.occupancy > 0.5):
                     face = Face(tet, nei)
                     faces.append(face)
-            print(tet.occupancy)
+            # print(tet.occupancy)
         return faces
 
     def export_mesh(self, path):
@@ -415,12 +413,13 @@ class QuarTet:
         with open(path, 'w+') as f:
             f.write("\n".join(obj_file_str_vert))
             f.write("\n".join(obj_file_str_faces))
-
+        
+    
     def export_point_cloud(self, path, n=2500):
         # points, _ = self.sample_point_cloud_2(N)
         s = time.time()
         print("Start sampling pts")
-        points, _ = self.sample_point_cloud_2(n)
+        points = self.sample_point_cloud_4(n)
         print(f"Done {time.time() - s}")
         pc = PointCloud()
         pc.init_with_points(points)
@@ -429,8 +428,8 @@ class QuarTet:
 
 if __name__ == '__main__':
     # a = QuarTet(2, 'cpu')
-    a = QuarTet('../objects/cube_0.05.tet')
-    print("Loading quartet file")
+    a = QuarTet('../objects/cube_0.1.tet')
+    a.export_point_cloud('./pc.obj', 10000)
 
-    print("Exporting quartet")
-    a.export('cube.tet')
+    pc = PointCloud()
+    pc.load_file('./filled_sphere.obj')
