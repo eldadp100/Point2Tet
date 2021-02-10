@@ -5,6 +5,7 @@ import torch
 import random
 from pointcloud import PointCloud
 import itertools
+from random import choices
 
 
 def tensors_eq(v1, v2):
@@ -17,17 +18,17 @@ class Tetrahedron:
         self.occupancy = torch.tensor([0.5])  # torch.rand(1)  # very small chance to all be 0
         self.neighborhood = set()
         # self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4.
-        # self.features = torch.rand(30)
-        rand_vec = torch.rand(3) - 1
-        self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4. + rand_vec
-        self.features = torch.cat([self.features, torch.rand(27, requires_grad=True)])
+        self.features = torch.rand(30)
+        # rand_vec = torch.rand(3) - 1
+        # self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4. + rand_vec
+        # self.features = torch.cat([self.features, torch.rand(27, requires_grad=True)])
         self.prev_features = self.features
         self.sub_divided = None
         self.pooled = False
         self.depth = depth
 
         self.init_features = self.features.clone()
-        self.init_vertices = [v for v in self.vertices]
+        self.init_vertices = [v.clone() for v in self.vertices]
         self.init_occupancy = self.occupancy.clone()
 
     def add_neighbor(self, neighbor):
@@ -42,7 +43,7 @@ class Tetrahedron:
             for v2 in other.vertices:
                 if tensors_eq(v1.loc, v2.loc):
                     c += 1
-        return c == 3
+        return c >= 3
 
     def center(self):
         a = torch.stack([v.loc for v in self.vertices])
@@ -81,7 +82,9 @@ class Tetrahedron:
 
     def reset(self):
         self.features = self.init_features.clone().to(self.features.device)
-        self.vertices = [v.clone() for v in self.init_vertices]
+        for v, iv in zip(self.vertices, self.init_vertices):
+            v.reset(*iv.loc)
+        # self.vertices = [v for v in self.init_vertices]
         self.occupancy = self.init_occupancy.clone()
 
     def get_faces(self):
@@ -134,6 +137,10 @@ class Face:
 
 class Vertex:
     def __init__(self, x, y, z):
+        self.loc = torch.tensor([x, y, z], dtype=torch.float32)
+        self.on_boundary = x == 0 or x == 1 or y == 0 or y == 1 or z == 0 or z == 1
+
+    def reset(self, x, y, z):
         self.loc = torch.tensor([x, y, z], dtype=torch.float32)
         self.on_boundary = x == 0 or x == 1 or y == 0 or y == 1 or z == 0 or z == 1
 
@@ -310,7 +317,6 @@ class QuarTet:
         """
         TODO: change to .tet format
         """
-
         with open(path, "w") as output_file:
             vertex_to_idx = {}
             n_ver = 0
@@ -375,13 +381,14 @@ class QuarTet:
         occupied_tets = self.curr_tetrahedrons
         # volumes = [tet.volume() * tet.occupancy for tet in occupied_tets]
         volumes = [tet.occupancy for tet in occupied_tets]
+
         volumes_total = sum(volumes)
 
-        points_count = [np.int(np.ceil(((volume / volumes_total) * pc_size).item())) for volume in volumes]
+        points_count = [np.int(np.floor(((volume / volumes_total) * pc_size).item())) for volume in volumes]
 
         samples = []
         for i, tet in enumerate(occupied_tets):
-            if points_count[i] <= 1:
+            if points_count[i] < 1:
                 continue
             for _ in range(points_count[i]):
                 r = np.random.rand(4)
@@ -389,6 +396,16 @@ class QuarTet:
 
         samples = random.choices(samples, k=pc_size)
         return torch.stack(samples), volumes
+
+
+    def sample_point_cloud_3(self, pc_size):
+        samples = []
+        occupancies = [tet.occupancy for tet in self.curr_tetrahedrons]
+        for tet in choices(self.curr_tetrahedrons, occupancies, k=pc_size):
+            r = np.random.rand(4)
+            samples.append(sum([r[i] * tet.vertices[i].loc for i in range(4)]) / 4.)
+
+        return torch.stack(samples), occupancies
 
     def reset(self):
         for tet in self.curr_tetrahedrons:
@@ -429,9 +446,7 @@ class QuarTet:
     def export_point_cloud(self, path, n=2500):
         # points, _ = self.sample_point_cloud_2(N)
         s = time.time()
-        print("Start sampling pts")
-        points, _ = self.sample_point_cloud_2(n)
-        print(f"Done {time.time() - s}")
+        points, _ = self.sample_point_cloud_3(n)
         pc = PointCloud()
         pc.init_with_points(points)
         pc.write_to_file(path)
