@@ -14,13 +14,13 @@ def tensors_eq(v1, v2):
 class Tetrahedron:
     def __init__(self, vertices, depth=0):
         self.vertices = sorted(vertices)
-        self.occupancy = torch.tensor([0.5])  # torch.rand(1)  # very small chance to all be 0
+        self.occupancy = torch.tensor(1./6000)  # torch.rand(1)  # very small chance to all be 0
         self.neighborhood = set()
-        # self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4.
-        # self.features = torch.rand(30)
-        rand_vec = torch.rand(3) - 1
-        self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4. + rand_vec
-        self.features = torch.cat([self.features, torch.rand(27, requires_grad=True)])
+        self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4.
+        self.features = torch.rand(30)
+        # rand_vec = torch.rand(3) - 1
+        # self.features = torch.stack([v.loc for v in self.vertices]).permute(1, 0).sum(dim=-1) / 4. + rand_vec
+        # self.features = torch.cat([self.features, torch.rand(27, requires_grad=True)])
         self.prev_features = self.features
         self.sub_divided = None
         self.pooled = False
@@ -29,7 +29,7 @@ class Tetrahedron:
         self.init_features = self.features.clone()
         self.init_vertices = [v for v in self.vertices]
         self.init_occupancy = self.occupancy.clone()
-    
+
     def sample_points(self, n):
         a, b, c, d = [v.loc for v in self.vertices]
         t1 = b - a
@@ -48,7 +48,7 @@ class Tetrahedron:
             q_lst.append(q[1:])
 
         return [a + q[0] * t1 + q[1] * t2 + q[2] * t3 for q in q_lst]
-    
+
     def add_neighbor(self, neighbor):
         self.neighborhood.add(neighbor)
 
@@ -194,7 +194,6 @@ class Vertex:
         return not (self >= other)
 
 
-
 class QuarTet:
     def __init__(self, path='../cube_0.05.tet', device='cpu'):
         self.curr_tetrahedrons = None
@@ -248,6 +247,14 @@ class QuarTet:
 
     def __len__(self):
         return len(self.curr_tetrahedrons)
+
+    def get_centers(self):
+        samples_weights = []
+        for tet in self.curr_tetrahedrons:
+            samples_weights.append((tet.center().loc, tet.occupancy))  # grad of 1
+        samples = torch.stack([x[0] for x in samples_weights])
+        weights = torch.stack([x[1] for x in samples_weights])
+        return samples, weights
 
     def sample_point_cloud(self, pc_size):
 
@@ -377,7 +384,6 @@ class QuarTet:
         for tet in self.curr_tetrahedrons:
             tet.features.requires_grad_()
 
-
     def reset(self):
         for tet in self.curr_tetrahedrons:
             tet.reset()
@@ -413,8 +419,7 @@ class QuarTet:
         with open(path, 'w+') as f:
             f.write("\n".join(obj_file_str_vert))
             f.write("\n".join(obj_file_str_faces))
-        
-    
+
     def export_point_cloud(self, path, n=2500):
         # points, _ = self.sample_point_cloud_2(N)
         s = time.time()
@@ -424,6 +429,14 @@ class QuarTet:
         pc = PointCloud()
         pc.init_with_points(points)
         pc.write_to_file(path)
+
+    def fill_sphere(self):
+        cube_center = torch.tensor([[0.5, 0.5, 0.5]])
+        for tet in self.curr_tetrahedrons:
+            if torch.cdist(tet.center().loc.unsqueeze(0), cube_center) <= 0.5:
+                tet.occupancy = torch.tensor(1.)
+            else:
+                tet.occupancy = torch.tensor(0.)
 
 
 if __name__ == '__main__':

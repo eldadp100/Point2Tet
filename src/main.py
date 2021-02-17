@@ -129,7 +129,7 @@ import os
 
 import matplotlib.pyplot as plt
 
-import playground.bad_grad_viz as grad_vis
+# import playground.bad_grad_viz as grad_vis
 
 options = Options()
 opts = options.args
@@ -175,6 +175,7 @@ init_environment(opts)
 start_creating_quartet = time.time()
 print("start creating quartet")
 quartet = QuarTet(opts.init_cube, device)
+quartet.fill_sphere()
 print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
 
 # input filled point cloud
@@ -204,11 +205,14 @@ for i in range(range_init, opts.iterations + 1):
     print(f"iteration {i} starts")
     iter_start_time = time.time()
 
-
+    # # sample different points every iteration
+    # chamfer_sample_size = min(original_input_xyz.shape[0], opts.chamfer_samples)
+    # indices = np.random.randint(0, original_input_xyz.shape[0], chamfer_sample_size)
+    # input_xyz = original_input_xyz[indices]
     # TODO: Subdivide every opts.upsamp
     net(quartet)  # in place changes
     s = time.time()
-    _loss = loss.loss(quartet, input_xyz, n=chamfer_sample_size)
+    _loss = loss.loss(quartet, input_xyz)
 
     ######################################################
     print('occupancy gradient:')
