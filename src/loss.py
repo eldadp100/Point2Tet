@@ -1,7 +1,7 @@
 import time
 import torch
-from chamferdist import ChamferDistance
-from wighted_chamferdist import ChamferDistance as Weighted_CD
+# from chamferdist import ChamferDistance
+from weighted_chamferdist import ChamferDistance as Weighted_CD
 
 
 
