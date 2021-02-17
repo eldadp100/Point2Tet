@@ -5,6 +5,8 @@ import torch
 import random
 from pointcloud import PointCloud
 import itertools
+from fill_pointcloud import face_ray_intersect
+import os
 
 
 def tensors_eq(v1, v2):
@@ -104,7 +106,10 @@ class Tetrahedron:
         self.occupancy = self.init_occupancy.clone()
 
     def get_faces(self):
-        return list(itertools.combinations(self.vertices, 3))
+        '''
+        :return: returns a list of 4 tuples of size 3 of vertices, each representing a face
+        '''
+        return list(map(set, itertools.combinations(self.vertices, 3)))
 
 
 def calculate_and_update_neighborhood(tetrahedrons, vertices):
@@ -138,11 +143,15 @@ def intersect(tet1, tet2):
 
 
 class Face:
-    def __init__(self, tet1, tet2):
-        assert tet1.is_neighbor(tet2)
-        self.tet1 = tet1
-        self.tet2 = tet2
-        self.face_coords = intersect(self.tet1, self.tet2)
+    def __init__(self, tet1=None, tet2=None, vertices=None):
+        if vertices is not None:
+            self.face_coords = torch.stack([v.loc for v in vertices])
+        else:
+            assert tet1.is_neighbor(tet2)
+            self.tet1 = tet1
+            self.tet2 = tet2
+            self.face_coords = intersect(self.tet1, self.tet2)
+        self.plane = None
 
     def get_tets(self):
         return self.tet1, self.tet2
@@ -150,14 +159,37 @@ class Face:
     def __iter__(self):
         return iter(self.face_coords)
 
+    def get_face_plane(self):
+        if self.plane is not None:
+            return self.plane
+        # lazy initialization
+        mat = np.ones((4, 4))
+        mat[:3, :3] = np.array(self.face_coords)
+        mat[3, 3] = 0
+        b = np.zeros(4)
+        b[3] = -1
+        solution = np.linalg.solve(mat, b)
+        self.plane = solution
+        return solution
+
 
 class Vertex:
-    def __init__(self, x, y, z):
-        self.loc = torch.tensor([x, y, z], dtype=torch.float32)
+    def __init__(self, x, y, z, neighborhood=[]):
+        self.loc = torch.tensor([x, y, z], dtype=torch.float64)
         self.on_boundary = x == 0 or x == 1 or y == 0 or y == 1 or z == 0 or z == 1
+        self.neighborhood = neighborhood
 
     def update_vertex(self, move_vector):
         if not self.on_boundary:
+            ####### FACE CLIPPING OF VERTICES - NOT EFFICIENT! #######
+            # if self.neighborhood is not None:
+            #     for face in self.neighborhood:
+            #         intersects, intersections = face_ray_intersect((self.loc.unsqueeze(0), move_vector.type(torch.float64)),
+            #                                                        torch.tensor(face.face_coords, dtype=torch.float64), face.get_face_plane())
+            #         if intersects[0] and torch.cdist(intersections[0].unsqueeze(0),
+            #                                          self.loc.unsqueeze(0)) >= torch.linalg.norm(move_vector):
+            #             self.loc = torch.clip(self.loc + move_vector, 0., 1.)
+            # else:
             self.loc = torch.clip(self.loc + move_vector, 0., 1.)
 
     def get_xyz(self):
@@ -195,10 +227,19 @@ class Vertex:
 
 
 class QuarTet:
-    def __init__(self, path='../cube_0.05.tet', device='cpu'):
+    def __init__(self, path='../cube_0.05.tet', device='cpu', occupancies_path=None):
         self.curr_tetrahedrons = None
         self.vertices = None
-        self.load(path, device)
+        self.load(path, device, occupancies_path)
+        self.fill_vertex_neighbors()
+
+    def fill_vertex_neighbors(self):
+        for tet in self.curr_tetrahedrons:
+            faces = tet.get_faces()
+            for v in tet.vertices:
+                for face in faces:
+                    if v not in face:
+                        v.neighborhood.append(Face(vertices=face))
 
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
@@ -319,32 +360,36 @@ class QuarTet:
             samples.append(little_qube)
         return torch.cat(samples)
 
-    def export(self, path):
+    def export(self, path, export_occupancies=True):
         """
         TODO: change to .tet format
         """
-
         with open(path, "w") as output_file:
             vertex_to_idx = {}
             n_ver = 0
-            to_write = ""
+            to_write = []
+            occupancies_str = []
             for tet in self.curr_tetrahedrons:
                 for v in tet.vertices:
                     if v not in vertex_to_idx:
                         x, y, z = v.loc
-                        to_write += f"{x} {y} {z}\n"
+                        to_write.append(f"{x} {y} {z}\n")
                         vertex_to_idx[v] = n_ver
                         n_ver += 1
 
             for tet in self.curr_tetrahedrons:
-                if tet.occupancy > 0.5:
-                    indices = [vertex_to_idx[v] for v in tet.vertices]
-                    to_write += f"{indices[0]} {indices[1]} {indices[2]} {indices[3]}\n"
+                indices = [vertex_to_idx[v] for v in tet.vertices]
+                to_write.append(f"{indices[0]} {indices[1]} {indices[2]} {indices[3]}\n")
+                occupancies_str.append(f"{tet.occupancy}\n")
 
             output_file.write(f"tet {n_ver} {len(self.curr_tetrahedrons)}\n")
-            output_file.write(to_write)
+            output_file.write(''.join(to_write))
 
-    def load(self, path, device):
+        name_without_extension, _ = os.path.splitext(path)
+        with open(f'{name_without_extension}_occupancies.occ', 'w') as output_file:
+            output_file.write(''.join(occupancies_str))
+
+    def load(self, path, device, occupancies_path=None):
         self.curr_tetrahedrons = []
         vertices = []
         with open(path, "r") as input_file:
@@ -359,10 +404,13 @@ class QuarTet:
                     print(f'Read {i} vertices')
 
             self.vertices = vertices
-            print(f'Finished reading vertices\nReading {int(first_line_split[2])} tetrahedrons')
-            for i in range(int(first_line_split[2])):
+            num_tets = int(first_line_split[2])
+            print(f'Finished reading vertices\nReading {num_tets} tetrahedrons')
+            for i in range(num_tets):
                 line = input_file.readline()
                 vertex_indices = line.split(' ')
+                if len(vertex_indices) < 3:
+                    continue
                 self.curr_tetrahedrons.append(Tetrahedron([vertices[int(i)] for i in vertex_indices]))
                 if i % 2000 == 0 and i > 0:
                     print(f'Read {i} tetrhedrons')
@@ -371,8 +419,17 @@ class QuarTet:
         calculate_and_update_neighborhood(self.curr_tetrahedrons, vertices)
         print('Filling neighbors')
         self.fill_neighbors()
-        print('Merge same vertices')
-        self.merge_same_vertices()
+        # print('Merge same vertices')
+        # self.merge_same_vertices()
+
+        if occupancies_path is None:
+            base_name = os.path.splitext(path)[0]
+            occupancies_path = f"{base_name}_occupancies.occ"
+
+        if os.path.exists(occupancies_path):
+            with open(occupancies_path, 'r') as occupancies_input:
+                for occ, tet in zip(occupancies_input, self.curr_tetrahedrons):
+                    tet.occupancy = torch.tensor(float(occ))
 
         for tet in self.curr_tetrahedrons:
             tet.occupancy = tet.occupancy.cpu()
@@ -431,7 +488,7 @@ class QuarTet:
         pc.write_to_file(path)
 
     def fill_sphere(self):
-        cube_center = torch.tensor([[0.5, 0.5, 0.5]])
+        cube_center = torch.tensor([[0.5, 0.5, 0.5]], dtype=torch.float64)
         for tet in self.curr_tetrahedrons:
             if torch.cdist(tet.center().loc.unsqueeze(0), cube_center) <= 0.5:
                 tet.occupancy = torch.tensor(1.)
@@ -441,8 +498,18 @@ class QuarTet:
 
 if __name__ == '__main__':
     # a = QuarTet(2, 'cpu')
-    a = QuarTet('../objects/cube_0.1.tet')
-    a.export_point_cloud('./pc.obj', 10000)
+    # a = QuarTet('../objects_old/cube_0.05.tet')
+    a = QuarTet('try.tet')
+    # a.fill_sphere()
+    for tet in a:
+        print(len(tet.neighborhood))
+    # a.fill_sphere()
+    # a.export('try.tet')
+    # a = QuarTet('./quartet_100.tet')
+    # for tet in a:
+    #     print(len(tet.neighborhood))
+    # a.fill_sphere()
+    # a.export_point_cloud('./pc.obj', 10000)
 
-    pc = PointCloud()
-    pc.load_file('./filled_sphere.obj')
+    # pc = PointCloud()
+    # pc.load_file('./filled_sphere.obj')
