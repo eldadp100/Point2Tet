@@ -128,8 +128,7 @@ import numpy as np
 import os
 
 import matplotlib.pyplot as plt
-
-import playground.bad_grad_viz as grad_vis
+import visualizer
 
 options = Options()
 opts = options.args
@@ -173,16 +172,22 @@ def plot_grad_flow(named_parameters):
 init_environment(opts)
 
 start_creating_quartet = time.time()
+
 print("start creating quartet")
 quartet = QuarTet(opts.init_cube, device)
 print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
 
 # input filled point cloud
-# input_xyz, input_normals = torch.rand(100, 3, device=device), torch.rand(100, 3, device=device)
+# input_xyz, input_normals = torch.rand(100, 3, device=device), torch.rand(100, 3, device=device
+
 pc = PointCloud()
-pc.load_file(opts.input_filled_pc)
+# pc.load_file(opts.input_filled_pc)
+pc.load_with_normals("../objects/tiki.ply")
 pc.normalize()
 original_input_xyz = pc.points
+
+quartet_sdf = pc.calc_sdf(quartet.get_centers())
+quartet.update_occupancy_using_sdf(quartet_sdf)
 
 # sample different points every iteration
 chamfer_sample_size = min(original_input_xyz.shape[0], opts.chamfer_samples)
@@ -203,7 +208,6 @@ if opts.continue_train:
 for i in range(range_init, opts.iterations + 1):
     print(f"iteration {i} starts")
     iter_start_time = time.time()
-
 
     # TODO: Subdivide every opts.upsamp
     net(quartet)  # in place changes
@@ -269,7 +273,7 @@ for i in range(range_init, opts.iterations + 1):
 
         torch.save(state_dict, checkpoint_file_path)
         try:
-            quartet.export_point_cloud(out_pc_file_path, 2500)
+            quartet.export_point_cloud(out_pc_file_path)
         except:
             print("Error while trying to export point cloud")
 

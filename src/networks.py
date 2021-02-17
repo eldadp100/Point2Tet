@@ -95,9 +95,9 @@ class OurNet(nn.Module):
         # tets_occupancy = torch.min(tets_occupancy, torch.tensor([0.99], device=tets_occupancy.device).expand_as(tets_occupancy))
         tets_occupancy = tets_occupancy.cpu()
 
-        for i, tet in enumerate(mother_cube):
-            tet.update_by_deltas(tets_movements[i])
-            tet.occupancy = tets_occupancy[i]
+        # for i, tet in enumerate(mother_cube):
+            # tet.update_by_deltas(tets_movements[i])
+            # tet.occupancy = tets_occupancy[i]
 
 def reset_params(model):
     for i, m in enumerate(model.modules()):

@@ -165,7 +165,7 @@ class Vertex:
 
     def update_vertex(self, move_vector):
         if not self.on_boundary:
-            self.loc = torch.clip(self.loc + move_vector, 0., 1.)
+            self.loc = torch.clamp(self.loc + move_vector, 0., 1.)
 
     def get_xyz(self):
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
@@ -255,6 +255,26 @@ class QuarTet:
 
     def __len__(self):
         return len(self.curr_tetrahedrons)
+
+    def get_centers(self):
+        centers = []
+        for tet in self.curr_tetrahedrons:
+            centers.append(tet.center().loc)
+        return torch.stack(centers)
+
+    def get_occupied_centers(self):
+        occupied_centers = []
+        for tet in self.curr_tetrahedrons:
+            if tet.occupancy >= 0.5:
+                occupied_centers.append(tet.center().loc)
+        return torch.stack(occupied_centers)
+
+    def update_occupancy_using_sdf(self, sdf):
+        for i, tet in enumerate(self.curr_tetrahedrons):
+            if sdf[i] <= 0:
+                tet.occupancy = torch.tensor(1.)
+            else:
+                tet.occupancy = torch.tensor(0.)
 
     def sample_point_cloud(self, pc_size):
 
@@ -431,11 +451,11 @@ class QuarTet:
             f.write("\n".join(obj_file_str_faces))
         
     
-    def export_point_cloud(self, path, n=2500):
+    def export_point_cloud(self, path):
         # points, _ = self.sample_point_cloud_2(N)
         s = time.time()
         print("Start sampling pts")
-        points = self.sample_point_cloud_4(n)
+        points = self.get_occupied_centers()
         print(f"Done {time.time() - s}")
         pc = PointCloud()
         pc.init_with_points(points)
