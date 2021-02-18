@@ -190,7 +190,7 @@ chamfer_sample_size = min(original_input_xyz.shape[0], opts.chamfer_samples)
 indices = np.random.randint(0, original_input_xyz.shape[0], chamfer_sample_size)
 input_xyz = original_input_xyz[indices]
 
-net, optimizer, scheduler = init_net(opts, device)
+net, optimizer, scheduler = init_net(opts, len(quartet), device)
 
 # range_init = opts.iteration_number if opts.continue_train else 1
 range_init = 1
@@ -202,6 +202,7 @@ if opts.continue_train:
         range_init = opts.iteration_number
 
 for i in range(range_init, opts.iterations + 1):
+
     print(f"iteration {i} starts")
     iter_start_time = time.time()
 
@@ -223,7 +224,7 @@ for i in range(range_init, opts.iterations + 1):
         print('None')
     ######################################################
     print('movement gradient:')
-    grad = net.net_vertices_movements.weight.grad
+    grad = net.net_vertices_movements[0].weight.grad
     if grad is not None:
         print(f'max = {grad.max()}, min = {grad.min()}')
     else:
@@ -252,7 +253,7 @@ for i in range(range_init, opts.iterations + 1):
     print(_loss)
     # scheduler.step()
 
-    if i != 0 and i % opts.save_freq == 0:
+    if i % opts.save_freq == 0:
         to_rename = f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt'
         if os.path.exists(to_rename):
             os.rename(to_rename, f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_{i - opts.save_freq}.pt')
