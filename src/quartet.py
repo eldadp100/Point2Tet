@@ -5,6 +5,7 @@ import torch
 import random
 from pointcloud import PointCloud
 import itertools
+import os
 
 from tetrahedral_group import TetsGroupSharesVertex
 
@@ -453,28 +454,43 @@ class QuarTet:
     #         samples.append(little_qube)
     #     return torch.cat(samples)
 
-    def export(self, path):
+    def export(self, path, export_occupancies=True):
         with open(path, "w") as output_file:
             vertex_to_idx = {}
             n_ver = 0
-            to_write = ""
+            to_write = []
+            occupancies_str = []
             for tet in self.curr_tetrahedrons:
                 for v in tet.vertices:
                     if v not in vertex_to_idx:
                         x, y, z = v.loc
-                        to_write += f"{x} {y} {z}\n"
+                        to_write.append(f"{x} {y} {z}\n")
                         vertex_to_idx[v] = n_ver
                         n_ver += 1
 
             for tet in self.curr_tetrahedrons:
-                if tet.occupancy > 0.5:
-                    indices = [vertex_to_idx[v] for v in tet.vertices]
-                    to_write += f"{indices[0]} {indices[1]} {indices[2]} {indices[3]}\n"
+                indices = [vertex_to_idx[v] for v in tet.vertices]
+                to_write.append(f"{indices[0]} {indices[1]} {indices[2]} {indices[3]}\n")
+                occupancies_str.append(f"{tet.occupancy}\n")
 
             output_file.write(f"tet {n_ver} {len(self.curr_tetrahedrons)}\n")
-            output_file.write(to_write)
+            output_file.write(''.join(to_write))
 
-    def load(self, path, device):
+        if export_occupancies:
+            name_without_extension, _ = os.path.splitext(path)
+            with open(f'{name_without_extension}_occupancies.occ', 'w') as output_file:
+                output_file.write(''.join(occupancies_str))
+
+    def load(self, path, device, occupancies_path=None):
+        '''
+        Loads a quartet from a file
+        :param path: the path to the quartet file in .tet format
+        :param device: the device to move the quartet to (e.g. 'cpu', 'cuda')
+        :param occupancies_path: an optional parameter representing a path to a file containing the occupancies
+                values of each tetrahedron. if 'default', the method uses the default name used the the quartet
+                while saving, if None no file is loaded and using default tetrahedron occupancies initialization
+        :return: None
+        '''
         self.curr_tetrahedrons = []
         vertices = []
         with open(path, "r") as input_file:
@@ -506,6 +522,16 @@ class QuarTet:
         self.fill_neighbors()
         print('Merge same vertices')
         self.merge_same_vertices()
+
+        if occupancies_path is not None:
+            if occupancies_path == 'default':
+                base_name = os.path.splitext(path)[0]
+                occupancies_path = f"{base_name}_occupancies.occ"
+
+            if os.path.exists(occupancies_path):
+                with open(occupancies_path, 'r') as occupancies_input:
+                    for occ, tet in zip(occupancies_input, self.curr_tetrahedrons):
+                        tet.occupancy = torch.tensor(float(occ))
 
         for tet in self.curr_tetrahedrons:
             tet.occupancy = tet.occupancy.cpu()
