@@ -21,7 +21,7 @@ def chamfer_dist_with_weights(tetrahedrons_centers, ground_truth_point_cloud, te
 
 
 def vertices_movement_bound_loss(quartet):
-    loss_1 = 0.
+    loss_1 = torch.tensor(0.)
     for v in quartet.vertices:
         sd = v.last_update_signed_distance
         loss_1 = loss_1 + torch.max(sd, torch.tensor(0.))
