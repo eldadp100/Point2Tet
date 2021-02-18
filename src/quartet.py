@@ -35,13 +35,20 @@ class Tetrahedron:
         self.pooled = False
         self.depth = depth
 
-        self.init_features = self.features.clone()
-        self.init_vertices = [v for v in self.vertices]
-        self.init_occupancy = self.occupancy.clone()
-
         self.half_faces = []
         self.faces_by_vertex = {}
         self.faces_by_vertex_opposite = {}
+
+        self.init_features = None
+        self.init_vertices = None
+        self.init_occupancy = None
+
+        self.set_as_init_values()
+
+    def set_as_init_values(self):
+        self.init_features = self.features.clone()
+        self.init_vertices = [v.clone() for v in self.vertices]
+        self.init_occupancy = self.occupancy.clone()
 
     def sample_points(self, n):
         a, b, c, d = [v.loc for v in self.vertices]
@@ -261,8 +268,9 @@ class HalfFace:
 
 class Vertex:
     def __init__(self, x, y, z):
+
         self.loc = torch.tensor([x, y, z], dtype=torch.float32)
-        self.original_loc = self.loc.clone()
+        self.original_loc = self.loc.detach().clone()
         self.on_boundary = x == 0 or x == 1 or y == 0 or y == 1 or z == 0 or z == 1
 
         self.tets_group = None
@@ -276,8 +284,6 @@ class Vertex:
         if not self.on_boundary:
             # self.loc = torch.clip(self.loc + move_vector, 0., 1.)
             self.loc = self.loc + move_vector
-        else:
-            self.last_update_signed_distance = 0.  # torch.tensor([0.])  # TODO: try 0.
 
         self.tets_group.v = self
 
@@ -288,6 +294,7 @@ class Vertex:
     def clone(self):
         v = Vertex(*self.get_xyz())
         v.loc = v.loc.to(self.loc.device)
+        v.tets_group = self.tets_group
         return v
 
     def __hash__(self):
@@ -525,6 +532,9 @@ class QuarTet:
             v.set_tets_group(v_tets_list)
             for tet in v_tets_list:
                 assert len(tet.faces_by_vertex) != 0
+
+        for tet in self.curr_tetrahedrons:
+            tet.set_as_init_values()
 
     def reset(self):
         for tet in self.curr_tetrahedrons:
