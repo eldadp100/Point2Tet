@@ -47,7 +47,6 @@ class Tetrahedron:
 
     def set_as_init_values(self):
         self.init_features = self.features.clone()
-        self.init_vertices = [v.clone() for v in self.vertices]
         self.init_occupancy = self.occupancy.clone()
 
     def sample_points(self, n):
@@ -124,8 +123,9 @@ class Tetrahedron:
 
     def reset(self):
         self.features = self.init_features.clone().to(self.features.device)
-        self.vertices = [v.clone() for v in self.init_vertices]
         self.occupancy = self.init_occupancy.clone()
+        for v in self.vertices:
+            v.reset()
 
     def get_faces(self):
         return list(itertools.combinations(self.vertices, 3))
@@ -152,10 +152,10 @@ class Tetrahedron:
 
         ##########################################################################
         for v in self.vertices:
-            self.faces_by_vertex[v] = [hf for hf in self.half_faces if hf.has(v)]
+            self.faces_by_vertex[tuple(v.loc.numpy())] = [hf for hf in self.half_faces if hf.has(v)]
             tmp = [hf for hf in self.half_faces if not hf.has(v)]
             assert len(tmp) == 1
-            self.faces_by_vertex_opposite[v] = tmp[0]
+            self.faces_by_vertex_opposite[tuple(v.loc.numpy())] = tmp[0]
 
     def get_half_faces(self):
         return self.half_faces
@@ -291,15 +291,12 @@ class Vertex:
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
         return x, y, z
 
-    def clone(self):
-        v = Vertex(*self.get_xyz())
-        v.loc = v.loc.to(self.loc.device)
-        v.tets_group = self.tets_group
-        return v
-
     def __hash__(self):
         x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
         return (x, y, z).__hash__()
+
+    def __eq__(self, other):
+        return self.get_xyz() == other.get_xyz()
 
     def __ge__(self, other):
         x, y, z = self.loc
@@ -324,6 +321,9 @@ class Vertex:
     def set_tets_group(self, tets_list):
         assert self.tets_group is None
         self.tets_group = TetsGroupSharesVertex(self, tets_list)
+
+    def reset(self):
+        self.loc = self.original_loc.detach().clone()
 
 
 class QuarTet:
