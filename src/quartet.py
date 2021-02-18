@@ -91,6 +91,10 @@ class Tetrahedron:
         for m, v in zip(vertices_deltas, self.vertices):
             v.update_vertex(m)
 
+    def update_move_signed_distance(self, vertices_deltas):
+        for m, v in zip(vertices_deltas, self.vertices):
+            v.update_sd_loss(m)
+
     @staticmethod
     def determinant_3x3(m):
         return (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
@@ -264,9 +268,12 @@ class Vertex:
         self.tets_group = None
         self.last_update_signed_distance = None
 
+    def update_sd_loss(self, move_vector):
+        if not self.on_boundary:
+            self.last_update_signed_distance += self.tets_group.query_direction(move_vector)
+
     def update_vertex(self, move_vector):
         if not self.on_boundary:
-            self.last_update_signed_distance = self.tets_group.query_direction(move_vector)
             # self.loc = torch.clip(self.loc + move_vector, 0., 1.)
             self.loc = self.loc + move_vector
         else:
@@ -516,6 +523,8 @@ class QuarTet:
 
         for v, v_tets_list in vertex_tet_dict.items():
             v.set_tets_group(v_tets_list)
+            for tet in v_tets_list:
+                assert len(tet.faces_by_vertex) != 0
 
     def reset(self):
         for tet in self.curr_tetrahedrons:
