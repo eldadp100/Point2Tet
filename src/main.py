@@ -273,20 +273,9 @@ for i in range(range_init, opts.iterations + 1):
         }
 
         torch.save(state_dict, checkpoint_file_path)
-        try:
-            quartet.export_point_cloud(out_pc_file_path, 2500)
-        except:
-            print("Error while trying to export point cloud")
-
-        try:
-            quartet.export(out_quartet_file_path)
-        except:
-            pass
-
-        try:
-            quartet.export_mesh(out_mesh_file_path)
-        except:
-            pass
+        quartet.export_point_cloud(out_pc_file_path, 2500)
+        quartet.export(out_quartet_file_path)
+        quartet.export_mesh(out_mesh_file_path)
 
     quartet.reset()
 

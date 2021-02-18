@@ -547,9 +547,9 @@ class QuarTet:
                 if tet == nei:
                     continue
                 if (tet.occupancy > 0.5) ^ (nei.occupancy > 0.5):
-                    face_coords = intersect(tet, nei)
-                    if face_coords not in faces:
-                        faces.add(face_coords)
+                    face_container = tuple(intersect(tet, nei))
+                    if face_container not in faces:
+                        faces.add(face_container)
             # print(tet.occupancy)
         return faces
 
@@ -561,13 +561,13 @@ class QuarTet:
         c = 1
         for i, f_coords in enumerate(faces):
             for v in f_coords:
-                x, y, z = v.get_xyz()
-                if (x, y, z) not in vertices:
-                    vertices[(x, y, z)] = c
+                if v not in vertices:
+                    vertices[v] = c
                     c += 1
+                x, y, z = v
                 obj_file_str_vert.append(f"v {x} {y} {z}")
             obj_file_str_faces.append(
-                f"f {vertices[f_coords[0].get_xyz()]} {vertices[f_coords[1].get_xyz()]} {vertices[f_coords[2].get_xyz()]}")
+                f"f {vertices[f_coords[0]]} {vertices[f_coords[1]]} {vertices[f_coords[2]]}")
         with open(path, 'w+') as f:
             f.write("\n".join(obj_file_str_vert))
             f.write("\n".join(obj_file_str_faces))
