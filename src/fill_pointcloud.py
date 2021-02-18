@@ -170,20 +170,20 @@ class FillPointCloud(pointcloud.PointCloud):
             raise Exception("not valid fill interior method")
 
 
-# # test
-# if __name__ == '__main__':
-#     _mesh = mesh.Mesh('../objects/init_mesh.obj')
-#     pc = FillPointCloud()
-#     pc.load_file('../objects/pc.obj')
-#     pc.fill_interior_of_point_cloud(method='mesh', _mesh=_mesh, N=10000)
-#     pc.write_to_file("pc.obj")
-
-# normalize point cloud
+# test
 if __name__ == '__main__':
+    _mesh = mesh.Mesh('../objects_old/init_mesh.obj')
     pc = FillPointCloud()
-    pc.load_file('../objects/filled_sphere.obj')
-    pc.normalize()
-    pc.write_to_file("../objects/filled_sphere.obj")
+    pc.load_file('../objects_old/pc.obj')
+    pc.fill_interior_of_point_cloud(method='mesh', _mesh=_mesh, N=10000)
+    pc.write_to_file("pc.obj")
+
+# # normalize point cloud
+# if __name__ == '__main__':
+#     pc = FillPointCloud()
+#     pc.load_file('../objects/filled_sphere.obj')
+#     pc.normalize()
+#     pc.write_to_file("../objects/filled_sphere.obj")
 
 # # argument parsing
 # if __name__ == '__main__':
