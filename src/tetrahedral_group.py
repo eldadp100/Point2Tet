@@ -32,7 +32,7 @@ class TetsGroupSharesVertex:
                 curr_side = None
                 is_in = True
                 assert tet.faces_by_vertex.keys() is not None
-                for face in tet.faces_by_vertex[self.v]:
+                for face in tet.faces_by_vertex[tuple(self.v.original_loc.numpy())]:
                     face_plane = face.plane
                     side = face_plane.get_point_side(self.v.loc + direction)
                     if curr_side is None:
@@ -50,4 +50,4 @@ class TetsGroupSharesVertex:
 
         TetsGroupSharesVertex.time_monitor["query_direction"][0] += 1
         TetsGroupSharesVertex.time_monitor["query_direction"][1] += time.time() - start_time
-        return tet.faces_by_vertex_opposite[self.v].plane.signed_distance(self.v.loc + direction, side)
+        return tet.faces_by_vertex_opposite[tuple(self.v.original_loc.numpy())].plane.signed_distance(self.v.loc + direction, side)

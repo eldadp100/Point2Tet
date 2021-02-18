@@ -109,8 +109,13 @@ class OurNet(nn.Module):
 
         # total_occupancy = tets_occupancy.sum()
 
-        for v in mother_cube.vertices:
-            v.last_update_signed_distance = torch.tensor(0.)
+        # for v in mother_cube.vertices:
+        #     v.last_update_signed_distance = torch.tensor(0.)
+
+        for i, tet in enumerate(mother_cube):
+            for v in tet.vertices:
+                v.last_update_signed_distance = torch.tensor(0.)
+
         for i, tet in enumerate(mother_cube):
             tet.update_move_signed_distance(tets_movements[i])
 
