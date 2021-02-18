@@ -27,11 +27,11 @@ class TetsGroupSharesVertex:
         return signed distance to the face opposite to the vertex moved in the direction
         """
         start_time = time.time()
-
         def get_tet():
             for tet in self.tets_list:
                 curr_side = None
                 is_in = True
+                assert tet.faces_by_vertex.keys() is not None
                 for face in tet.faces_by_vertex[self.v]:
                     face_plane = face.plane
                     side = face_plane.get_point_side(self.v.loc + direction)
@@ -43,11 +43,11 @@ class TetsGroupSharesVertex:
                             break
                 if is_in:
                     return tet, curr_side
+            return None, None
 
         tet, side = get_tet()
         assert tet is not None
 
         TetsGroupSharesVertex.time_monitor["query_direction"][0] += 1
         TetsGroupSharesVertex.time_monitor["query_direction"][1] += time.time() - start_time
-
         return tet.faces_by_vertex_opposite[self.v].plane.signed_distance(self.v.loc + direction, side)
