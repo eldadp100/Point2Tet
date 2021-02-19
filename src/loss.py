@@ -20,6 +20,22 @@ def chamfer_dist_with_weights(tetrahedrons_centers, ground_truth_point_cloud, te
     return dist
 
 
+def chamfer_dist_with_weights_2(tetrahedrons_centers, ground_truth_point_cloud, tetrahedrons_weights):
+    chamferDist = ChamferDistance()
+
+    src_pc = torch.cat([tetrahedrons_centers, tetrahedrons_weights.unsqueeze(0)], dim=2)
+    dst1_pc = torch.cat([ground_truth_point_cloud, torch.ones((1, ground_truth_point_cloud.shape[1], 1))], dim=2)
+    dst2_pc = torch.cat(
+        [torch.rand((1, ground_truth_point_cloud.shape[1], 3)), torch.zeros((1, ground_truth_point_cloud.shape[1], 1))],
+        dim=2)
+    dst_pc = torch.cat([dst1_pc, dst2_pc], dim=1)
+
+    src_pc = src_pc.type(torch.FloatTensor)
+    dst_pc = dst_pc.type(torch.FloatTensor)
+    dist = chamferDist.forward(src_pc, dst_pc, bidirectional=True)
+    return dist
+
+
 def vertices_movement_bound_loss(quartet):
     loss_1 = torch.tensor(0.)
     for v in quartet.vertices:
@@ -46,14 +62,21 @@ def occupancy_chamfer_loss(quartet_pts, pc, centers_weights):
     return chamfer_loss
 
 
+def occupancy_chamfer_loss_2(quartet_pts, pc, centers_weights):
+    chamfer_loss = chamfer_dist_with_weights_2(quartet_pts.unsqueeze(0), pc.unsqueeze(0), centers_weights)
+    return chamfer_loss
+
+
 def loss(quartet, pc):
     quartet_pts_1 = quartet.sample_point_cloud(pc.shape[0])
     quartet_pts_2, centers_weights = quartet.sample_point_cloud_2(pc.shape[0])
+    quartet_pts_3, centers_weights = quartet.sample_point_cloud_2(2 * pc.shape[0])
     loss_monitor = {
         "vertices_movements_chamfer_loss": (0., vertices_movements_chamfer_loss(quartet_pts_1, pc)),
         "vertices_movement_bound_loss": (0., vertices_movement_bound_loss(quartet)),
         "volumes_loss": (0., volumes_loss(quartet)),
-        "occupancy_chamfer_loss": (1., occupancy_chamfer_loss(quartet_pts_2, pc, centers_weights))
+        "occupancy_chamfer_loss": (1., occupancy_chamfer_loss(quartet_pts_2, pc, centers_weights)),
+        "occupancy_chamfer_loss_2": (1., occupancy_chamfer_loss_2(quartet_pts_3, pc, centers_weights))
     }
 
     return sum([lambda_i * loss_i for lambda_i, loss_i in loss_monitor.values()]), loss_monitor
