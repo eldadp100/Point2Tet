@@ -7,12 +7,16 @@
 """
 import time
 
+import torch
+
 
 class TetsGroupSharesVertex:
     time_monitor = {
         "init": [0., 0.],
         "query_direction": [0., 0.]
     }
+
+    counter = 0
 
     def __init__(self, v, tets_list):
         start_time = time.time()
@@ -27,27 +31,24 @@ class TetsGroupSharesVertex:
         return signed distance to the face opposite to the vertex moved in the direction
         """
         start_time = time.time()
+        query_point = self.v.original_loc + direction
         def get_tet():
             for tet in self.tets_list:
-                curr_side = None
-                is_in = True
-                assert tet.faces_by_vertex.keys() is not None
-                for face in tet.faces_by_vertex[tuple(self.v.original_loc.numpy())]:
-                    face_plane = face.plane
-                    side = face_plane.get_point_side(self.v.loc + direction)
-                    if curr_side is None:
-                        curr_side = side
-                    else:
-                        if side != curr_side:
-                            is_in = False
-                            break
-                if is_in:
-                    return tet, curr_side
-            return None, None
+                tet_hfs = tet.faces_by_vertex[self.v.get_original_xyz()]
+                sides = [hf.plane.get_point_side(query_point) for hf in tet_hfs]
+                if not (False in sides):
+                    return tet
+            return None
 
-        tet, side = get_tet()
-        assert tet is not None
+        tet = get_tet()
+        if tet is not None:
+            TetsGroupSharesVertex.time_monitor["query_direction"][0] += 1
+            TetsGroupSharesVertex.time_monitor["query_direction"][1] += time.time() - start_time
+            return tet.faces_by_vertex_opposite[self.v.get_original_xyz()].plane.signed_distance(
+                self.v.original_loc + direction)
+        else:
+            TetsGroupSharesVertex.counter += 1
+            if TetsGroupSharesVertex.counter % 100 == 0:
+                print(TetsGroupSharesVertex.counter)
 
-        TetsGroupSharesVertex.time_monitor["query_direction"][0] += 1
-        TetsGroupSharesVertex.time_monitor["query_direction"][1] += time.time() - start_time
-        return tet.faces_by_vertex_opposite[tuple(self.v.original_loc.numpy())].plane.signed_distance(self.v.loc + direction, side)
+            return torch.tensor(0.)

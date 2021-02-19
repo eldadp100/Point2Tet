@@ -203,7 +203,7 @@ if opts.continue_train:
 
 for i in range(range_init, opts.iterations + 1):
 
-    print(f"iteration {i} starts")
+    # print(f"iteration {i} starts")
     iter_start_time = time.time()
 
     # # sample different points every iteration
@@ -212,26 +212,28 @@ for i in range(range_init, opts.iterations + 1):
     # input_xyz = original_input_xyz[indices]
     # TODO: Subdivide every opts.upsamp
     net(quartet)  # in place changes
-    s = time.time()
-    _loss = loss.loss(quartet, input_xyz)
+    _loss, loss_monitor = loss.loss(quartet, input_xyz)
+    print({k: f"{v[1].item() :.5f}" for k, v in loss_monitor.items()})
 
-    ######################################################
-    print('occupancy gradient:')
-    grad = net.net_occupancy[0].weight.grad
-    if grad is not None:
-        print(f'max = {grad.max()}, min = {grad.min()}')
-    else:
-        print('None')
-    ######################################################
-    print('movement gradient:')
-    grad = net.net_vertices_movements[0].weight.grad
-    if grad is not None:
-        print(f'max = {grad.max()}, min = {grad.min()}')
-    else:
-        print('None')
-    ######################################################
+    if i % 100 == 0:
+        print({k: f"{v[1].item() :.5f}" for k, v in loss_monitor.items()})
+        ######################################################
+        print('occupancy gradient:')
+        grad = net.net_occupancy[0].weight.grad
+        if grad is not None:
+            print(f'max = {grad.max()}, min = {grad.min()}')
+        else:
+            print('None')
+        ######################################################
+        print('movement gradient:')
+        grad = net.net_vertices_movements[0].weight.grad
+        if grad is not None:
+            print(f'max = {grad.max()}, min = {grad.min()}')
+        else:
+            print('None')
+        ######################################################
+        print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
 
-    print(time.time() - s)
     optimizer.zero_grad()
 
     ########################
@@ -250,7 +252,9 @@ for i in range(range_init, opts.iterations + 1):
     # net.net_occupancy._modules['0'].weight.grad
     optimizer.step()
     quartet.zero_grad()
-    print(_loss)
+
+    # print(_loss)
+
     # scheduler.step()
 
     if i % opts.save_freq == 0:
@@ -289,8 +293,7 @@ for i in range(range_init, opts.iterations + 1):
             pass
 
     quartet.reset()
-
-    print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
+    # print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
 
 print(_loss)
 
