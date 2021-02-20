@@ -437,6 +437,27 @@ class QuarTet:
         return len(self.curr_tetrahedrons)
 
     def get_centers(self):
+        centers = []
+        for tet in self.curr_tetrahedrons:
+            centers.append(tet.center().loc)
+        return torch.stack(centers)
+
+    def get_occupied_centers(self):
+        occupied_centers = []
+        for tet in self.curr_tetrahedrons:
+            if tet.occupancy >= 0.5:
+                occupied_centers.append(tet.center().loc)
+        return torch.stack(occupied_centers)
+
+    def update_occupancy_using_sdf(self, sdf):
+        for i, tet in enumerate(self.curr_tetrahedrons):
+            if sdf[i] <= 0:
+                tet.occupancy = torch.tensor(1.)
+            else:
+                tet.occupancy = torch.tensor(0.)
+
+    def sample_point_cloud(self, pc_size):
+
         samples_weights = []
         for tet in self.curr_tetrahedrons:
             samples_weights.append((tet.center().curr_loc, tet.occupancy))  # grad of 1
