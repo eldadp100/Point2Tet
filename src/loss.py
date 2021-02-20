@@ -41,7 +41,7 @@ def vertices_movement_bound_loss(quartet):
     for v in quartet.vertices:
         sd = v.last_update_signed_distance
         loss_1 = loss_1 + torch.max(sd, torch.tensor(0.))
-    loss_1 /= len(quartet)
+    # loss_1 /= len(quartet)
     return loss_1
 
 
@@ -72,11 +72,11 @@ def loss(quartet, pc):
     quartet_pts_2, centers_weights = quartet.sample_point_cloud_2(pc.shape[0])
     quartet_pts_3, centers_weights = quartet.sample_point_cloud_2(2 * pc.shape[0])
     loss_monitor = {
-        "vertices_movements_chamfer_loss": (0., vertices_movements_chamfer_loss(quartet_pts_1, pc)),
-        "vertices_movement_bound_loss": (0., vertices_movement_bound_loss(quartet)),
-        "volumes_loss": (0., volumes_loss(quartet)),
-        "occupancy_chamfer_loss": (1., occupancy_chamfer_loss(quartet_pts_2, pc, centers_weights)),
-        "occupancy_chamfer_loss_2": (1., occupancy_chamfer_loss_2(quartet_pts_3, pc, centers_weights))
+        "vertices_movements_chamfer_loss": (1., vertices_movements_chamfer_loss(quartet_pts_1, pc)),
+        "vertices_movement_bound_loss": (1., vertices_movement_bound_loss(quartet)),
+        "volumes_loss": (0.3, volumes_loss(quartet)),
+        "occupancy_chamfer_loss": (0., occupancy_chamfer_loss(quartet_pts_2, pc, centers_weights)),
+        # "occupancy_chamfer_loss_2": (0., occupancy_chamfer_loss_2(quartet_pts_3, pc, centers_weights))
     }
 
     return sum([lambda_i * loss_i for lambda_i, loss_i in loss_monitor.values()]), loss_monitor

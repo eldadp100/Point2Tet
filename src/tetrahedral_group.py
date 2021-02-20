@@ -32,6 +32,7 @@ class TetsGroupSharesVertex:
         """
         start_time = time.time()
         query_point = self.v.original_loc + direction
+
         def get_tet():
             for tet in self.tets_list:
                 tet_hfs = tet.faces_by_vertex[self.v.get_original_xyz()]
@@ -52,3 +53,9 @@ class TetsGroupSharesVertex:
                 print(TetsGroupSharesVertex.counter)
 
             return torch.tensor(0.)
+
+    def update_tets_list(self, to_remove, to_add):
+        for _to_remove in to_remove:
+            self.tets_list.remove(_to_remove)
+        for _to_add in to_add:
+            self.tets_list.append(_to_add)
