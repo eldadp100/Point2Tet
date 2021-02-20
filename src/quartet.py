@@ -5,8 +5,7 @@ import torch
 import random
 from pointcloud import PointCloud
 import itertools
-import os
-
+from scipy.linalg import null_space
 from tetrahedral_group import TetsGroupSharesVertex
 
 
@@ -51,7 +50,7 @@ class Tetrahedron:
         self.init_occupancy = self.occupancy.clone()
 
     def sample_points(self, n):
-        a, b, c, d = [v.loc for v in self.vertices]
+        a, b, c, d = [v.curr_loc for v in self.vertices]
         t1 = b - a
         t2 = c - a
         t3 = d - a
@@ -79,13 +78,14 @@ class Tetrahedron:
         c = 0
         for v1 in self.vertices:
             for v2 in other.vertices:
-                if tensors_eq(v1.loc, v2.loc):
+                if tensors_eq(v1.original_loc, v2.original_loc):
                     c += 1
         return c == 3
 
     def center(self):
-        a = torch.stack([v.loc for v in self.vertices])
+        a = torch.stack([v.curr_loc for v in self.vertices])
         loc = a.permute(1, 0).sum(dim=1) / 4.
+        loc = loc.type(torch.float)
         return Vertex(*loc)
 
     def __hash__(self):
@@ -115,7 +115,7 @@ class Tetrahedron:
                 a[2] - b[2])
 
     def volume(self):
-        p1, p2, p3, p4 = [v.loc for v in self.vertices]
+        p1, p2, p3, p4 = [v.curr_loc for v in self.vertices]
         return torch.det(torch.stack([p1 - p4, p2 - p4, p3 - p4])) / 6
 
     def translate(self, vec):
@@ -137,7 +137,7 @@ class Tetrahedron:
         assert len(self.half_faces) == 0
         for nei in self.neighborhood:
             if self.is_neighbor(nei):  # can also be on the boundary so we add itself as a neighbor
-                face_coords = intersect(self, nei)
+                face_coords = [v.original_loc for v in intersect(self, nei)]
                 self.half_faces.append(HalfFace(face_coords, (self, nei)))
 
         new_coords = []
@@ -149,14 +149,24 @@ class Tetrahedron:
             if is_new:
                 new_coords.append(face_coords)
         for coords in new_coords:
-            self.half_faces.append(HalfFace([v.loc for v in coords], (self, self)))
+            self.half_faces.append(HalfFace([v.original_loc for v in coords], (self, self)))
 
         ##########################################################################
         for v in self.vertices:
-            self.faces_by_vertex[tuple(v.loc.numpy())] = [hf for hf in self.half_faces if hf.has(v)]
-            tmp = [hf for hf in self.half_faces if not hf.has(v)]
+            self.faces_by_vertex[v.get_original_xyz()] = [hf for hf in self.half_faces if hf.has(v.original_loc)]
+            for hf in self.faces_by_vertex[v.get_original_xyz()]:
+                assert abs(hf.plane.signed_distance(v.original_loc)) < 0.01
+            tmp = [hf for hf in self.half_faces if not hf.has(v.original_loc)]
             assert len(tmp) == 1
-            self.faces_by_vertex_opposite[tuple(v.loc.numpy())] = tmp[0]
+            self.faces_by_vertex_opposite[v.get_original_xyz()] = tmp[0]
+
+        self.half_faces[0].set_orientation()
+
+        # tests:
+        center = self.center().original_loc
+        sides = [hf.plane.get_point_side(center) for hf in self.half_faces]
+        for b in sides:
+            assert sides[0] == b
 
     def get_half_faces(self):
         return self.half_faces
@@ -185,10 +195,10 @@ def vertices_intersection(ver1, ver2):
     for v1 in ver1:
         exist = False
         for v2 in ver2:
-            if tensors_eq(v1.loc, v2.loc):
+            if tensors_eq(v1.original_loc, v2.original_loc):
                 exist = True
         if exist:
-            intersection.append(v1.loc)
+            intersection.append(v1)
     return intersection
 
 
@@ -209,20 +219,17 @@ class Plane:
         self.a = -self.a
         self.b = -self.b
         self.c = -self.c
+        self.d = -self.d
 
     def get_normal(self):
-        return torch.tensor([self.a, self.b, self.c])
+        return torch.tensor([self.a, self.b, self.c], dtype=torch.float)
 
     def get_point_side(self, x):
         """ True is right, False is left"""
-        return self.a * x[0] + self.b * x[1] + self.c * x[2] + self.d > 0.
+        return self.a * x[0] + self.b * x[1] + self.c * x[2] + self.d >= 0.
 
-    def signed_distance(self, x, side):
-        val = self.a * x[0] + self.b * x[1] + self.c * x[2] + self.d
-        if side:
-            return val
-        else:
-            return -val
+    def signed_distance(self, x):
+        return self.a * x[0] + self.b * x[1] + self.c * x[2] + self.d
 
 
 class HalfFace:
@@ -234,11 +241,10 @@ class HalfFace:
         if np.linalg.matrix_rank(mat) == 3:
             b = -np.ones(3)
             solution = np.linalg.solve(mat, b)
-            self.plane = Plane(solution[0], solution[1], solution[2], 0.)
-        else:
-            solution = np.linalg.eig(mat)
-            solution = solution[1][abs(solution[0]).argmin()]
             self.plane = Plane(solution[0], solution[1], solution[2], 1.)
+        else:
+            solution = null_space(mat)[:, 0]
+            self.plane = Plane(solution[0], solution[1], solution[2], 0.)
 
         self.tets = tets
         self.oriented = False  # all half faces of the same tet are with same orientation
@@ -247,10 +253,15 @@ class HalfFace:
         if self.oriented:
             return None
         tet_half_faces = self.tets[0].get_half_faces()
-        n1 = tet_half_faces[0].plane.get_normal()
+        center = self.tets[0].center().original_loc
         for half_face in tet_half_faces:
-            if not torch.dot(half_face.plane.get_normal(), n1) > 0:
+            if not torch.dot(half_face.plane.get_normal(), center) + half_face.plane.d > 0:
                 half_face.plane.change_orientation()
+
+        center = self.tets[0].center().original_loc
+        sides = [hf.plane.get_point_side(center) for hf in tet_half_faces]
+        assert not ((not sides[0]) in sides)
+
         self.oriented = True
 
     def is_eq(self, three_vertices):
@@ -261,7 +272,7 @@ class HalfFace:
 
     def has(self, v):
         for v2 in self.coords:
-            if tensors_eq(v.loc, v2):
+            if tensors_eq(v, v2):
                 return True
 
         return False
@@ -269,13 +280,18 @@ class HalfFace:
 
 class Vertex:
     def __init__(self, x, y, z):
-
-        self.loc = torch.tensor([x, y, z], dtype=torch.float32)
-        self.original_loc = self.loc.detach().clone()
-        self.on_boundary = x == 0 or x == 1 or y == 0 or y == 1 or z == 0 or z == 1
+        self.curr_loc = torch.tensor([x, y, z], dtype=torch.float32)
+        self.original_loc = self.curr_loc.detach().clone()
+        self.on_boundary = self.is_on_boundary()
 
         self.tets_group = None
         self.last_update_signed_distance = None
+
+    def is_on_boundary(self):
+        for i in range(3):
+            if self.curr_loc[i] > 0.99 or self.curr_loc[i] < 0.01:
+                return True
+        return False
 
     def update_sd_loss(self, move_vector):
         if not self.on_boundary:
@@ -283,25 +299,30 @@ class Vertex:
 
     def update_vertex(self, move_vector):
         if not self.on_boundary:
-            # self.loc = torch.clip(self.loc + move_vector, 0., 1.)
-            self.loc = self.loc + move_vector
+            self.curr_loc = self.curr_loc + move_vector
 
-        self.tets_group.v = self
+    def reset(self):
+        self.curr_loc = self.original_loc.detach().clone()
+        self.last_update_signed_distance = None
 
-    def get_xyz(self):
-        x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
+    def get_curr_xyz(self):
+        x, y, z = self.curr_loc[0].item(), self.curr_loc[1].item(), self.curr_loc[2].item()
+        return x, y, z
+
+    def get_original_xyz(self):
+        x, y, z = self.original_loc[0].item(), self.original_loc[1].item(), self.original_loc[2].item()
         return x, y, z
 
     def __hash__(self):
-        x, y, z = self.loc[0].item(), self.loc[1].item(), self.loc[2].item()
+        x, y, z = self.get_original_xyz()
         return (x, y, z).__hash__()
 
     def __eq__(self, other):
-        return self.get_xyz() == other.get_xyz()
+        return self.get_original_xyz() == other.get_original_xyz()
 
     def __ge__(self, other):
-        x, y, z = self.loc
-        ox, oy, oz = other.loc
+        x, y, z = self.original_loc
+        ox, oy, oz = other.original_loc
         if x < ox:
             return False
         if x > ox:
@@ -323,9 +344,6 @@ class Vertex:
         assert self.tets_group is None
         self.tets_group = TetsGroupSharesVertex(self, tets_list)
 
-    def reset(self):
-        self.loc = self.original_loc.detach().clone()
-
 
 class QuarTet:
     def __init__(self, path='../cube_0.05.tet', device='cpu'):
@@ -344,20 +362,18 @@ class QuarTet:
         all_vertices = {}
         for tet in self.curr_tetrahedrons:
             for v in tet.vertices:
-                all_vertices[v] = v
+                all_vertices[v.get_original_xyz()] = v
 
         for tet in self.curr_tetrahedrons:
             new_vertices = []
             for v in tet.vertices:
-                new_vertices.append(all_vertices[v])
+                new_vertices.append(all_vertices[v.get_original_xyz()])
             tet.vertices = new_vertices
 
     def zero_grad(self):
         for tet in self.curr_tetrahedrons:
             tet.features = tet.features.detach().clone()
             tet.prev_features = tet.prev_features.detach().clone()
-            for i in range(4):
-                tet.vertices[i].loc = tet.vertices[i].loc.detach().clone()
 
     # def sample_disjoint_faces(self, N):  # TODO: do it exact N
     #     faces = []
@@ -386,7 +402,7 @@ class QuarTet:
     def get_centers(self):
         samples_weights = []
         for tet in self.curr_tetrahedrons:
-            samples_weights.append((tet.center().loc, tet.occupancy))  # grad of 1
+            samples_weights.append((tet.center().curr_loc, tet.occupancy))  # grad of 1
         samples = torch.stack([x[0] for x in samples_weights])
         weights = torch.stack([x[1] for x in samples_weights])
         return samples, weights
@@ -431,13 +447,23 @@ class QuarTet:
             for _ in range(points_count[i]):
                 r = np.random.rand(4)
                 r /= np.sum(r)
-                samples.append(sum([r[i] * tet.vertices[i].loc for i in range(4)]))
+                samples.append(sum([r[i] * tet.vertices[i].curr_loc for i in range(4)]))
 
         # if len(samples) == 0:
         #     return torch.rand(pc_size, 3)
         samples = random.choices(samples, k=pc_size)
         # return torch.stack(samples), volumes
         return torch.stack(samples)
+
+    def sample_point_cloud_2(self, pc_size):
+
+        samples_weights = []
+        for tet in self.curr_tetrahedrons:
+            samples_weights.append((tet.center().original_loc, tet.occupancy))  # grad of 1
+        samples_weights = random.choices(samples_weights, k=pc_size)
+        samples = torch.stack([x[0] for x in samples_weights])
+        weights = torch.stack([x[1] for x in samples_weights])
+        return samples, weights
 
     # def sample_point_cloud_4(self, pc_size):
     #     occupied_tets = self.curr_tetrahedrons
@@ -454,43 +480,28 @@ class QuarTet:
     #         samples.append(little_qube)
     #     return torch.cat(samples)
 
-    def export(self, path, export_occupancies=True):
+    def export(self, path):
         with open(path, "w") as output_file:
             vertex_to_idx = {}
             n_ver = 0
-            to_write = []
-            occupancies_str = []
+            to_write = ""
             for tet in self.curr_tetrahedrons:
                 for v in tet.vertices:
                     if v not in vertex_to_idx:
-                        x, y, z = v.loc
-                        to_write.append(f"{x} {y} {z}\n")
+                        x, y, z = v.curr_loc
+                        to_write += f"{x} {y} {z}\n"
                         vertex_to_idx[v] = n_ver
                         n_ver += 1
 
             for tet in self.curr_tetrahedrons:
-                indices = [vertex_to_idx[v] for v in tet.vertices]
-                to_write.append(f"{indices[0]} {indices[1]} {indices[2]} {indices[3]}\n")
-                occupancies_str.append(f"{tet.occupancy}\n")
+                if tet.occupancy > 0.5:
+                    indices = [vertex_to_idx[v] for v in tet.vertices]
+                    to_write += f"{indices[0]} {indices[1]} {indices[2]} {indices[3]}\n"
 
             output_file.write(f"tet {n_ver} {len(self.curr_tetrahedrons)}\n")
-            output_file.write(''.join(to_write))
+            output_file.write(to_write)
 
-        if export_occupancies:
-            name_without_extension, _ = os.path.splitext(path)
-            with open(f'{name_without_extension}_occupancies.occ', 'w') as output_file:
-                output_file.write(''.join(occupancies_str))
-
-    def load(self, path, device, occupancies_path=None):
-        '''
-        Loads a quartet from a file
-        :param path: the path to the quartet file in .tet format
-        :param device: the device to move the quartet to (e.g. 'cpu', 'cuda')
-        :param occupancies_path: an optional parameter representing a path to a file containing the occupancies
-                values of each tetrahedron. if 'default', the method uses the default name used the the quartet
-                while saving, if None no file is loaded and using default tetrahedron occupancies initialization
-        :return: None
-        '''
+    def load(self, path, device):
         self.curr_tetrahedrons = []
         vertices = []
         with open(path, "r") as input_file:
@@ -500,7 +511,7 @@ class QuarTet:
             for i in range(int(first_line_split[1])):
                 line = input_file.readline()
                 coordinates = line.split(' ')
-                vertices.append(Vertex(*[float(c) for c in coordinates]))
+                vertices.append(Vertex(*[round(float(c), ndigits=5) for c in coordinates]))
                 if i % 2000 == 0 and i > 0:
                     print(f'Read {i} vertices')
 
@@ -523,29 +534,22 @@ class QuarTet:
         print('Merge same vertices')
         self.merge_same_vertices()
 
-        if occupancies_path is not None:
-            if occupancies_path == 'default':
-                base_name = os.path.splitext(path)[0]
-                occupancies_path = f"{base_name}_occupancies.occ"
-
-            if os.path.exists(occupancies_path):
-                with open(occupancies_path, 'r') as occupancies_input:
-                    for occ, tet in zip(occupancies_input, self.curr_tetrahedrons):
-                        tet.occupancy = torch.tensor(float(occ))
-
         for tet in self.curr_tetrahedrons:
             tet.occupancy = tet.occupancy.cpu()
             tet.features = tet.features.to(device)
             tet.tet_num = tet.tet_num.to(device)
             tet.prev_features = tet.prev_features.to(device)
             for i in range(4):
-                tet.vertices[i].loc = tet.vertices[i].loc.cpu()
+                tet.vertices[i].curr_loc = tet.vertices[i].curr_loc.cpu()
 
         for tet in self.curr_tetrahedrons:
             tet.features.requires_grad_()
 
         for tet in self.curr_tetrahedrons:
             tet.calculate_half_faces()
+
+        for tet in self.curr_tetrahedrons:
+            tet.half_faces[0].set_orientation()
 
         vertex_tet_dict = {}
         for tet in self.curr_tetrahedrons:
@@ -573,9 +577,9 @@ class QuarTet:
                 if tet == nei:
                     continue
                 if (tet.occupancy > 0.5) ^ (nei.occupancy > 0.5):
-                    face_container = tuple(intersect(tet, nei))
-                    if face_container not in faces:
-                        faces.add(face_container)
+                    face_coords = [v.curr_loc for v in intersect(tet, nei)]
+                    if face_coords not in faces:
+                        faces.add(face_coords)
             # print(tet.occupancy)
         return faces
 
@@ -587,13 +591,13 @@ class QuarTet:
         c = 1
         for i, f_coords in enumerate(faces):
             for v in f_coords:
-                if v not in vertices:
-                    vertices[v] = c
+                x, y, z = v.get_xyz()
+                if (x, y, z) not in vertices:
+                    vertices[(x, y, z)] = c
                     c += 1
-                x, y, z = v
                 obj_file_str_vert.append(f"v {x} {y} {z}")
             obj_file_str_faces.append(
-                f"f {vertices[f_coords[0]]} {vertices[f_coords[1]]} {vertices[f_coords[2]]}")
+                f"f {vertices[f_coords[0].get_xyz()]} {vertices[f_coords[1].get_xyz()]} {vertices[f_coords[2].get_xyz()]}")
         with open(path, 'w+') as f:
             f.write("\n".join(obj_file_str_vert))
             f.write("\n".join(obj_file_str_faces))
@@ -611,11 +615,12 @@ class QuarTet:
     def fill_sphere(self):
         cube_center = torch.tensor([[0.5, 0.5, 0.5]])
         for tet in self.curr_tetrahedrons:
-            if torch.cdist(tet.center().loc.unsqueeze(0), cube_center) <= 0.2:
-                tet.occupancy = torch.tensor(1.)
+            if torch.cdist(tet.center().curr_loc.unsqueeze(0), cube_center) <= 0.2:
+                tet.occupancy = torch.tensor(0.5)
                 tet.init_occupancy = tet.occupancy.clone()
             else:
-                tet.occupancy = torch.tensor(0.)
+                # tet.occupancy = torch.tensor(0.)
+                tet.occupancy = torch.tensor(0.5)
                 tet.init_occupancy = tet.occupancy.clone()
 
 

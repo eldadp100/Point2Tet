@@ -98,14 +98,14 @@ class OurNet(nn.Module):
         # 2.4 seconds  ---> 0.16 seconds
         tets_features = torch.stack([self.tet_embed(tet.tet_num) for tet in mother_cube])
         # tets_features = torch.stack([tet.features for tet in mother_cube])
-        tets_movements = self.net_vertices_movements(tets_features).reshape((-1, 4, 3)).cpu()
+        tets_movements = self.net_vertices_movements(tets_features).reshape((-1, 4, 3)).cpu() * 0.
         mother_cube.last_vertex_update_average = torch.linalg.norm(tets_movements, dim=-1).mean() * 0.
 
-        # tets_occupancy = torch.tanh(self.net_occupancy(tets_features)) / 2 + 0.5
-        # # tets_occupancy += 0.5 - torch.sum(tets_occupancy) / len(mother_cube)
-        # # tets_occupancy = torch.max(tets_occupancy, torch.tensor([0.01], device=tets_occupancy.device).expand_as(tets_occupancy))
-        # # tets_occupancy = torch.min(tets_occupancy, torch.tensor([0.99], device=tets_occupancy.device).expand_as(tets_occupancy))
-        # tets_occupancy = tets_occupancy.cpu()
+        tets_occupancy = torch.tanh(self.net_occupancy(tets_features)) / 2 + 0.5
+        # tets_occupancy += 0.5 - torch.sum(tets_occupancy) / len(mother_cube)
+        # tets_occupancy = torch.max(tets_occupancy, torch.tensor([0.01], device=tets_occupancy.device).expand_as(tets_occupancy))
+        # tets_occupancy = torch.min(tets_occupancy, torch.tensor([0.99], device=tets_occupancy.device).expand_as(tets_occupancy))
+        tets_occupancy = tets_occupancy.cpu()
 
         # total_occupancy = tets_occupancy.sum()
 
@@ -121,6 +121,7 @@ class OurNet(nn.Module):
 
         for i, tet in enumerate(mother_cube):
             tet.update_by_deltas(tets_movements[i])
+            tet.occupancy = tets_occupancy[i]
             # tet.occupancy = tets_occupancy[i] / total_occupancy
 
 
