@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import uuid
 
 
@@ -67,6 +68,44 @@ def export(file, vs, faces, vn=None, color=None):
 
 def random_file_name(ext, prefix='temp'):
     return f'{prefix}{uuid.uuid4()}.{ext}'
+
+
+def create_torus_point_cloud(major_radius=0.5, minor_radius=None, aspect_ratio=3., offset=(0.5, 0.5, 0.), filename='torus.obj',
+                 N=int(1e4)):
+    """
+    Creates a torus point cloud (only shell), and writes it to an .obj file
+    :param major_radius: the major radius of the torus (the distance between center of donut's perimeter and the center of the donut)
+    :param minor_radius: the minor radius of the torus (the radius of the donut's perimeter). if None determined by the major radius and the aspect ratio
+    :param aspect_ratio: the ratio between major and minor radiuses (major / minor). if the minor radius is given this parameter is ignored
+    :param offset: a tuple of size 3 containing offset to the torus on the x, y, z axis
+    :param filename: the file name to export the created torus to; if None no file is created
+    :param N: the number of points to sample
+    :return: a torch.tensor containing the points (of shape [N, 3])
+    """
+    if minor_radius is None:
+        minor_radius = major_radius / aspect_ratio
+
+    rng = np.random.default_rng()
+    thetas, phis = rng.uniform(high=360., size=N), rng.uniform(high=360., size=N)
+
+    def get_point(ct, cp, st, sp):
+        """ ct = cos(theta); cp = cos(phi); st = sin(theta); sp = sin(phi) """
+        temp = major_radius + minor_radius * ct
+        return torch.cat([
+            torch.tensor([temp * cp]),
+            torch.tensor([temp * sp]),
+            torch.tensor([minor_radius * st])
+        ])
+
+    result = torch.stack([get_point(ct, cp, st, sp) for ct, cp, st, sp in
+                          zip(np.cos(thetas), np.cos(phis), np.sin(thetas), np.sin(phis))])
+    result += torch.tensor(offset)
+    if filename is not None:
+        with open(filename, 'w') as f:
+            for point in result:
+                x, y, z = point
+                f.write(f"v {x.item()} {y.item()} {z.item()}\n")
+    return result
 
 
 if __name__ == '__main__':
