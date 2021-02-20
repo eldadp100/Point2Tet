@@ -172,6 +172,42 @@ class Tetrahedron:
     def get_half_faces(self):
         return self.half_faces
 
+    def subdivide(self):
+        """
+         subdivide tet into 4 tets that their shared vertex is the center
+        """
+
+        ret_tets = []
+        center = self.center()
+        unique_neighbors = []
+
+        vertex_to_tets_involved = {}
+        for i, half_face in enumerate(self.half_faces):
+            vertices_i = half_face.get_vertices() + [center]
+            ret_tets.append(Tetrahedron(vertices_i, tet_num=self.tet_num))
+
+            unique_nei = half_face.tets[1]
+            unique_neighbors.append(unique_nei)
+            unique_nei.remove_neighbor(self)
+            unique_nei.add_neighbor(ret_tets[i])
+
+            for v in half_face.coords:
+                if v not in vertex_to_tets_involved:
+                    vertex_to_tets_involved[v] = []
+                vertex_to_tets_involved[v.numpy()].append(ret_tets[i])
+
+        for i in range(4):
+            neighbors = [ret_tets[j] for j in range(4) if j != i] + [unique_neighbors[i]]
+            ret_tets[i].neighborhood = neighbors
+        for i in range(4):
+            ret_tets[i].calculate_half_faces(force=True)
+
+        center.set_tets_group(ret_tets)
+        for v in self.vertices:
+            v.update_tets_list(self, vertex_to_tets_involved[v.get_original_xyz()])  # TODO
+
+        return ret_tets, center
+
 
 def calculate_and_update_neighborhood(tetrahedrons, vertices):
     vertices_to_tets_dict = dict()
@@ -256,7 +292,7 @@ class HalfFace:
         tet_half_faces = self.tets[0].get_half_faces()
         center = self.tets[0].center().original_loc
         for half_face in tet_half_faces:
-            if not torch.dot(half_face.plane.get_normal(), center) + half_face.plane.d > 0:
+            if half_face.plane.signed_distance(center) > 0:
                 half_face.plane.change_orientation()
 
         center = self.tets[0].center().original_loc
@@ -661,13 +697,47 @@ class QuarTet:
     def fill_sphere(self):
         cube_center = torch.tensor([[0.5, 0.5, 0.5]])
         for tet in self.curr_tetrahedrons:
-            if torch.cdist(tet.center().curr_loc.unsqueeze(0), cube_center) <= 0.5:
+            if torch.cdist(tet.center().curr_loc.unsqueeze(0), cube_center) <= 0.2:
                 tet.occupancy = torch.tensor(1.)
                 tet.init_occupancy = tet.occupancy.clone()
             else:
-                # tet.occupancy = torch.tensor(0.)
                 tet.occupancy = torch.tensor(0.)
                 tet.init_occupancy = tet.occupancy.clone()
+
+    def subdivide_tets(self, net):
+        new_tetrahedrons = []
+        for i, tet in enumerate(self.curr_tetrahedrons):
+            new_tets, center = tet.subdivide()
+            self.vertices.append(center)
+
+        # TODO:
+        # set tets numbers
+        # set new tet embedding based on the previous
+
+        old_embedding = net.tet_embed.state_dict()["weight"]
+        new_embedding_weights = torch.empty((old_embedding.shape[0] * 4, *old_embedding.shape[1:]))
+
+        for i, tet in enumerate(new_tetrahedrons):
+            new_embedding_weights[i] = old_embedding(tet.tet_num)
+            tet.tet_num = i
+
+        new_embedding_weights.requires_grad_()
+        net.tet_embed = torch.nn.Embedding(*new_embedding_weights.shape)
+        net.tet_embed.load_state_dict({"weight": new_embedding_weights})
+
+        self.curr_tetrahedrons = new_tetrahedrons
+
+    def fix_at_position(self):
+        """
+        can be applied only if vertices_movement_bound_loss == 0.
+        """
+        for v in self.vertices:
+            v.original_loc = v.curr_loc.detach().clone()
+            # TODO:
+            # update v.tets_group (just set a new center) - not sure needed
+
+        for tet in self.curr_tetrahedrons:
+            tet.calculate_half_faces(force=True)
 
 
 if __name__ == '__main__':

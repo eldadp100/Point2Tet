@@ -43,7 +43,7 @@ simple_net = torch.nn.Sequential(
 from PIL import Image
 import skimage
 from torchvision.transforms import Compose, Resize, ToTensor, Normalize
-
+from torchvision.datasets import MNIST
 
 def get_cameraman_tensor(sidelength):
     img = Image.fromarray(skimage.data.camera())
@@ -88,7 +88,7 @@ class ImageFitting(Dataset):
 cameraman = ImageFitting(256)
 dataloader = DataLoader(cameraman, batch_size=1, pin_memory=True, num_workers=0)
 
-total_steps = 5000  # Since the whole image is our dataset, this just means 500 gradient descent steps.
+total_steps = 500  # Since the whole image is our dataset, this just means 500 gradient descent steps.
 optim = torch.optim.Adam(lr=1e-4, params=simple_net.parameters())
 
 model_input, ground_truth = next(iter(dataloader))
@@ -101,8 +101,37 @@ for step in range(total_steps):
     loss.backward()
     optim.step()
 
+    if (step == 0):
+        print(loss)
+
     random_lr = torch.rand(1) / 1000
     for g in optim.param_groups:
         g['lr'] = random_lr.item()
 
-    print(loss)
+print(loss)
+
+more_simple_net = torch.nn.Sequential(
+    torch.nn.Linear(2, 32),
+    torch.nn.ReLU(),
+    torch.nn.Linear(32, 32),
+    torch.nn.ReLU(),
+    torch.nn.Linear(32, 1),
+).cuda()
+
+optim_2 = torch.optim.Adam(more_simple_net.parameters(), 0.001)
+for _ in range(1000):
+    random_inputs = torch.rand((1000, 2)).cuda()
+    loss = ((more_simple_net(random_inputs) - simple_net(random_inputs)).abs()).mean()
+    optim_2.zero_grad()
+    loss.backward()
+    optim_2.step()
+
+    # random_lr = torch.rand(1) / 1000
+    # for g in optim.param_groups:
+    #     g['lr'] = random_lr.item()
+
+print(loss)
+
+model_output = more_simple_net(model_input)
+loss = ((model_output - ground_truth) ** 2).mean()
+print(loss)
