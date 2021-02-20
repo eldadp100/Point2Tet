@@ -503,9 +503,30 @@ class QuarTet:
             output_file.write(f"tet {n_ver} {len(self.curr_tetrahedrons)}\n")
             output_file.write(''.join(to_write))
 
-        name_without_extension, _ = os.path.splitext(path)
+        name_without_extension, extension = os.path.splitext(path)
         with open(f'{name_without_extension}_occupancies.occ', 'w') as output_file:
             output_file.write(''.join(occupancies_str))
+
+        with open(f'{name_without_extension}_filled{extension}', 'w') as output_file:
+            vertex_to_idx = {}
+            n_ver = 0
+            to_write = []
+            for tet in self.curr_tetrahedrons:
+                if tet.occupancy > 0.5:
+                    for v in tet.vertices:
+                        if v not in vertex_to_idx:
+                            x, y, z = v.curr_loc
+                            to_write.append(f"{x} {y} {z}\n")
+                            vertex_to_idx[v] = n_ver
+                            n_ver += 1
+
+            for tet in self.curr_tetrahedrons:
+                if tet.occupancy > 0.5:
+                    indices = [vertex_to_idx[v] for v in tet.vertices]
+                    to_write.append(f"{indices[0]} {indices[1]} {indices[2]} {indices[3]}\n")
+
+            output_file.write(f"tet {n_ver} {len(self.curr_tetrahedrons)}\n")
+            output_file.write(''.join(to_write))
 
 
     def load(self, path, device, occupancies_path=None):
@@ -640,26 +661,28 @@ class QuarTet:
     def fill_sphere(self):
         cube_center = torch.tensor([[0.5, 0.5, 0.5]])
         for tet in self.curr_tetrahedrons:
-            if torch.cdist(tet.center().curr_loc.unsqueeze(0), cube_center) <= 0.2:
-                tet.occupancy = torch.tensor(0.5)
+            if torch.cdist(tet.center().curr_loc.unsqueeze(0), cube_center) <= 0.5:
+                tet.occupancy = torch.tensor(1.)
                 tet.init_occupancy = tet.occupancy.clone()
             else:
                 # tet.occupancy = torch.tensor(0.)
-                tet.occupancy = torch.tensor(0.5)
+                tet.occupancy = torch.tensor(0.)
                 tet.init_occupancy = tet.occupancy.clone()
 
 
-if __name__ == '__main_1_':
+if __name__ == '__main__':
     # a = QuarTet(2, 'cpu')
     a = QuarTet('../objects/cube_0.1.tet')
     a.fill_sphere()
-    a.export_point_cloud('./pc.obj', 10000)
-
-    pc = PointCloud()
-    pc.load_file('./filled_sphere.obj')
-
-if __name__ == '__main__':
-    a = QuarTet('../checkpoints/default_name/quartet_100.tet')
+    # a.export_point_cloud('./pc.obj', 10000)
     a.export_mesh('./mesh.obj')
-    a.export_point_cloud('./pc.obj', 10000)
-    print(a.vertices)
+    a.export(path='quartet.tet')
+
+    # pc = PointCloud()
+    # pc.load_file('./filled_sphere.obj')
+
+# if __name__ == '__main__':
+#     a = QuarTet('../checkpoints/default_name/quartet_100.tet')
+#     a.export_mesh('./mesh.obj')
+#     a.export_point_cloud('./pc.obj', 10000)
+#     print(a.vertices)
