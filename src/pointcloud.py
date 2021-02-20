@@ -3,6 +3,7 @@ import _utils
 import numpy as np
 import mesh
 from mesh_to_sdf.surface_point_cloud import SurfacePointCloud
+import pyrender
 
 from _utils import read_pts
 
@@ -33,9 +34,15 @@ class PointCloud:
         self.points = torch.tensor(xyz)
 
     def normalize(self):
+        # self.points -= self.points.min()
+        # Z = self.points.permute(1, 0).max(dim=1).values
+        # self.points /= Z
+        # self.normals /= Z
+
         self.points -= self.points.permute(1, 0).mean(dim=1)
         self.points /= 2 * self.points.permute(1, 0).abs().max(dim=1).values
         self.points += 0.5
+
 
     def write_to_file(self, filename):
         with open(filename, "w") as output_file:
@@ -50,11 +57,21 @@ class PointCloud:
 
     def calc_sdf(self, query_points):
         spc = SurfacePointCloud(
-            None, 
+            None,
             points=self.points,
             normals=self.normals
         )
+
         return spc.get_sdf_in_batches(query_points)
+
+    def visualize_sdf(self, query_points, sdf):
+        colors = np.zeros(query_points.shape)
+        colors[sdf < 0, 2] = 1
+        colors[sdf > 0, 0] = 1
+        cloud = pyrender.Mesh.from_points(query_points, colors=colors)
+        scene = pyrender.Scene()
+        scene.add(cloud)
+        viewer = pyrender.Viewer(scene, use_raymond_lighting=True, point_size=2)
 
     def __iter__(self):
         return self.points.__iter__()
