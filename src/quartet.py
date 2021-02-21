@@ -625,8 +625,8 @@ class QuarTet:
         calculate_and_update_neighborhood(self.curr_tetrahedrons, vertices)
         print('Filling neighbors')
         self.fill_neighbors()
-        print('Merge same vertices')
-        self.merge_same_vertices()
+        # print('Merge same vertices')
+        # self.merge_same_vertices()
 
         if occupancies_path is not None:
             if occupancies_path == 'default':
@@ -684,6 +684,14 @@ class QuarTet:
                     face_container = tuple(intersect(tet, nei))
                     if face_container not in faces:
                         faces.add(face_container)
+
+                # checking if the face is on the boundary and the tetrahedron is occupied
+                # and therefore is part of the mesh
+                if tet.occupancy > 0.5:
+                    for face in tet.get_faces():
+                        face_container = tuple(face)
+                        if face_container not in faces and all([v.on_boundary for v in face_container]):
+                            faces.add(face_container)
         return faces
 
     def export_mesh(self, path):
@@ -697,12 +705,13 @@ class QuarTet:
                 if v not in vertices:
                     vertices[v] = c
                     c += 1
-                x, y, z = v.curr_loc
-                obj_file_str_vert.append(f"v {x} {y} {z}")
+                    x, y, z = v.curr_loc
+                    obj_file_str_vert.append(f"v {x} {y} {z}")
             obj_file_str_faces.append(
                 f"f {vertices[f_coords[0]]} {vertices[f_coords[1]]} {vertices[f_coords[2]]}")
         with open(path, 'w+') as f:
             f.write("\n".join(obj_file_str_vert))
+            f.write("\n")
             f.write("\n".join(obj_file_str_faces))
 
     def export_point_cloud(self, path, n=2500):
@@ -760,11 +769,17 @@ class QuarTet:
         for tet in self.curr_tetrahedrons:
             tet.calculate_half_faces(force=True)
 
+    def __getitem__(self, index):
+        return self.curr_tetrahedrons[index]
+
 
 if __name__ == '__main__':
     # a = QuarTet(2, 'cpu')
-    a = QuarTet('../objects/cube_0.1.tet')
+    a = QuarTet('../objects/cube_0.05.tet')
     a.fill_sphere()
+    # for tet in a:
+    #     tet.occupancy = torch.tensor(0.)
+    # a[5].occupancy = torch.tensor(1.)
     # a.export_point_cloud('./pc.obj', 10000)
     a.export_mesh('./mesh.obj')
     a.export(path='quartet.tet')
