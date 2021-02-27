@@ -28,3 +28,7 @@ def visualize_pointcloud(pc):
     o3d_pc = open3d.geometry.PointCloud(points)
     
     open3d.visualization.draw_geometries([o3d_pc])
+
+
+
+

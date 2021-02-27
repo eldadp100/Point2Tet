@@ -115,7 +115,7 @@ class OurNet(nn.Module):
 
         for i, tet in enumerate(mother_cube):
             for v in tet.vertices:
-                v.last_update_signed_distance = torch.tensor(0.)
+                v.last_update_signed_distance = [[], []]
         for i, tet in enumerate(mother_cube):
             tet.update_move_signed_distance(tets_movements[i])
         for i, tet in enumerate(mother_cube):

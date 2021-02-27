@@ -6,6 +6,7 @@ import random
 from pointcloud import PointCloud
 import itertools
 from scipy.linalg import null_space
+
 from tetrahedral_group import TetsGroupSharesVertex
 import os
 
@@ -72,6 +73,9 @@ class Tetrahedron:
     def add_neighbor(self, neighbor):
         self.neighborhood.add(neighbor)
 
+    def remove_neighbor(self, neighbor):
+        self.neighborhood.remove(neighbor)
+
     def update_occupancy(self, new_occupancy):
         self.occupancy = new_occupancy
 
@@ -117,7 +121,8 @@ class Tetrahedron:
 
     def volume(self):
         p1, p2, p3, p4 = [v.curr_loc for v in self.vertices]
-        return torch.det(torch.stack([p1 - p4, p2 - p4, p3 - p4])) / 6
+        vol = torch.det(torch.stack([p1 - p4, p2 - p4, p3 - p4])) / 6
+        return vol.abs()
 
     def translate(self, vec):
         for vert in self.vertices:
@@ -172,6 +177,43 @@ class Tetrahedron:
     def get_half_faces(self):
         return self.half_faces
 
+    # def subdivide(self):
+    #     """
+    #      subdivide tet into 4 tets that their shared vertex is the center
+    #     """
+    #
+    #     ret_tets = []
+    #     center = self.center()
+    #     unique_neighbors = []
+    #
+    #     vertex_to_tets_involved = {}
+    #     for i, half_face in enumerate(self.half_faces):
+    #         vertices_i = half_face.get_vertices() + [center]
+    #         ret_tets.append(Tetrahedron(vertices_i, tet_num=self.tet_num.item()))
+    #
+    #         unique_nei = half_face.tets[1]
+    #         unique_neighbors.append(unique_nei)
+    #         unique_nei.remove_neighbor(self)
+    #         unique_nei.add_neighbor(ret_tets[i])
+    #
+    #         for v in half_face.coords:
+    #             if v not in vertex_to_tets_involved:
+    #                 vertex_to_tets_involved[tuple(v.numpy())] = []
+    #             vertex_to_tets_involved[tuple(v.numpy())].append(ret_tets[i])
+    #
+    #     for i in range(4):
+    #         neighbors = [ret_tets[j] for j in range(4) if j != i] + [
+    #             unique_neighbors[i] if unique_neighbors[i] != self else ret_tets[i]]
+    #         ret_tets[i].neighborhood = set(neighbors)
+    #     for i in range(4):
+    #         ret_tets[i].calculate_half_faces(force=True)
+    #
+    #     center.set_tets_group(ret_tets)
+    #     for v in self.vertices:
+    #         v.tets_group.update_tets_list([self], vertex_to_tets_involved[v.get_original_xyz()])  # TODO
+    #
+    #     return ret_tets, center
+
     def subdivide(self):
         """
          subdivide tet into 4 tets that their shared vertex is the center
@@ -179,32 +221,9 @@ class Tetrahedron:
 
         ret_tets = []
         center = self.center()
-        unique_neighbors = []
-
-        vertex_to_tets_involved = {}
         for i, half_face in enumerate(self.half_faces):
             vertices_i = half_face.get_vertices() + [center]
-            ret_tets.append(Tetrahedron(vertices_i, tet_num=self.tet_num))
-
-            unique_nei = half_face.tets[1]
-            unique_neighbors.append(unique_nei)
-            unique_nei.remove_neighbor(self)
-            unique_nei.add_neighbor(ret_tets[i])
-
-            for v in half_face.coords:
-                if v not in vertex_to_tets_involved:
-                    vertex_to_tets_involved[v] = []
-                vertex_to_tets_involved[v.numpy()].append(ret_tets[i])
-
-        for i in range(4):
-            neighbors = [ret_tets[j] for j in range(4) if j != i] + [unique_neighbors[i]]
-            ret_tets[i].neighborhood = neighbors
-        for i in range(4):
-            ret_tets[i].calculate_half_faces(force=True)
-
-        center.set_tets_group(ret_tets)
-        for v in self.vertices:
-            v.update_tets_list(self, vertex_to_tets_involved[v.get_original_xyz()])  # TODO
+            ret_tets.append(Tetrahedron(vertices_i, tet_num=self.tet_num.item()))
 
         return ret_tets, center
 
@@ -263,7 +282,7 @@ class Plane:
 
     def get_point_side(self, x):
         """ True is right, False is left"""
-        return self.a * x[0] + self.b * x[1] + self.c * x[2] + self.d >= 0.
+        return self.a * x[0] + self.b * x[1] + self.c * x[2] + self.d <= 0.  # negative inside positive outside
 
     def signed_distance(self, x):
         return self.a * x[0] + self.b * x[1] + self.c * x[2] + self.d
@@ -280,7 +299,14 @@ class HalfFace:
             solution = np.linalg.solve(mat, b)
             self.plane = Plane(solution[0], solution[1], solution[2], 1.)
         else:
-            solution = null_space(mat)[:, 0]
+            mat_null_space = null_space(mat)
+            # solution = mat_null_space[:, 0]
+            if mat_null_space.shape[1] > 0:
+                solution = mat_null_space[:, 0]
+            else:
+                eigs = np.linalg.eig(mat)
+                solution = eigs[1][:, np.argmin(abs(eigs[0]))]
+
             self.plane = Plane(solution[0], solution[1], solution[2], 0.)
 
         self.tets = tets
@@ -292,7 +318,7 @@ class HalfFace:
         tet_half_faces = self.tets[0].get_half_faces()
         center = self.tets[0].center().original_loc
         for half_face in tet_half_faces:
-            if half_face.plane.signed_distance(center) > 0:
+            if not half_face.plane.get_point_side(center):
                 half_face.plane.change_orientation()
 
         center = self.tets[0].center().original_loc
@@ -300,6 +326,9 @@ class HalfFace:
         assert not ((not sides[0]) in sides)
 
         self.oriented = True
+
+    def get_vertices(self):
+        return [Vertex(*c.numpy()) for c in self.coords]
 
     def is_eq(self, three_vertices):
         return len(vertices_intersection(three_vertices, [Vertex(*x) for x in self.coords])) == 3
@@ -332,7 +361,9 @@ class Vertex:
 
     def update_sd_loss(self, move_vector):
         if not self.on_boundary:
-            self.last_update_signed_distance += self.tets_group.query_direction(move_vector)
+            a, b = self.tets_group.query_direction(move_vector)  # TODO: a,b...
+            self.last_update_signed_distance[0].append(a)
+            self.last_update_signed_distance[1].append(b)
 
     def update_vertex(self, move_vector):
         if not self.on_boundary:
@@ -389,6 +420,7 @@ class QuarTet:
         self.load(path, device)
 
         self.last_vertex_update_average = None
+        self.device = device
 
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
@@ -578,14 +610,8 @@ class QuarTet:
                 if i % 2000 == 0 and i > 0:
                     print(f'Read {i} tetrhedrons')
 
-        print('Calculating neighborhoods')
-        calculate_and_update_neighborhood(self.curr_tetrahedrons, vertices)
-        print('Filling neighbors')
-        self.fill_neighbors()
-        print('Merge same vertices')
-        self.merge_same_vertices()
-
         if occupancies_path is not None:
+            print("Load occupancies")
             if occupancies_path == 'default':
                 base_name = os.path.splitext(path)[0]
                 occupancies_path = f"{base_name}_occupancies.occ"
@@ -602,6 +628,16 @@ class QuarTet:
             tet.prev_features = tet.prev_features.to(device)
             for i in range(4):
                 tet.vertices[i].curr_loc = tet.vertices[i].curr_loc.cpu()
+
+        self.do_init_calculations()
+
+    def do_init_calculations(self):
+        print('Calculating neighborhoods')
+        calculate_and_update_neighborhood(self.curr_tetrahedrons, self.vertices)
+        print('Filling neighbors')
+        self.fill_neighbors()
+        print('Merge same vertices')
+        self.merge_same_vertices()
 
         for tet in self.curr_tetrahedrons:
             tet.features.requires_grad_()
@@ -675,33 +711,68 @@ class QuarTet:
     def fill_sphere(self):
         cube_center = torch.tensor([[0.5, 0.5, 0.5]])
         for tet in self.curr_tetrahedrons:
-            if torch.cdist(tet.center().curr_loc.unsqueeze(0), cube_center) <= 0.2:
+            if torch.cdist(tet.center().curr_loc.unsqueeze(0), cube_center) <= 0.5:
                 tet.occupancy = torch.tensor(1.)
                 tet.init_occupancy = tet.occupancy.clone()
             else:
                 tet.occupancy = torch.tensor(0.)
                 tet.init_occupancy = tet.occupancy.clone()
 
+    # def subdivide_tets(self, net):
+    #     new_tetrahedrons = []
+    #     for i, tet in enumerate(self.curr_tetrahedrons):
+    #         new_tets, center = tet.subdivide()
+    #         self.vertices.append(center)
+    #         new_tetrahedrons.extend(new_tets)
+    #         for tet2 in new_tets:
+    #             assert tet not in tet2.neighborhood
+    #     for tet1 in self.curr_tetrahedrons:
+    #         if not (True in [v.on_boundary for v in tet1.vertices]):
+    #             for tet2 in new_tetrahedrons:
+    #                 assert tet1 not in tet2.neighborhood
+    #     # TODO:
+    #     # set tets numbers
+    #     # set new tet embedding based on the previous
+    #
+    #     old_embedding = net.tet_embed.state_dict()["weight"]
+    #     new_embedding_weights = torch.empty((old_embedding.shape[0] * 4, *old_embedding.shape[1:]))
+    #
+    #     for i, tet in enumerate(new_tetrahedrons):
+    #         new_embedding_weights[i] = old_embedding[tet.tet_num]
+    #         tet.tet_num = torch.tensor(i)
+    #
+    #     new_embedding_weights.requires_grad_()
+    #     net.tet_embed = torch.nn.Embedding(*new_embedding_weights.shape)
+    #     net.tet_embed.load_state_dict({"weight": new_embedding_weights})
+    #
+    #     self.curr_tetrahedrons = new_tetrahedrons
+
     def subdivide_tets(self, net):
         new_tetrahedrons = []
+        vertices = []
         for i, tet in enumerate(self.curr_tetrahedrons):
             new_tets, center = tet.subdivide()
-            self.vertices.append(center)
+            new_vertices = [Vertex(*v.get_original_xyz()) for v in tet.vertices] + [center]
+            vertices.extend(new_vertices)
+            new_tetrahedrons.extend(new_tets)
+        self.vertices = vertices
+        self.curr_tetrahedrons = new_tetrahedrons
 
-        # TODO:
-        # set tets numbers
-        # set new tet embedding based on the previous
+        # neighbors + half faces calculations
+        self.do_init_calculations()
 
+        # update embeddings
         old_embedding = net.tet_embed.state_dict()["weight"]
         new_embedding_weights = torch.empty((old_embedding.shape[0] * 4, *old_embedding.shape[1:]))
 
         for i, tet in enumerate(new_tetrahedrons):
-            new_embedding_weights[i] = old_embedding(tet.tet_num)
-            tet.tet_num = i
-
+            new_embedding_weights[i] = old_embedding[tet.tet_num]
+            tet.tet_num = torch.tensor(i, device=old_embedding.device)
+        new_embedding_weights.to(old_embedding.device)
         new_embedding_weights.requires_grad_()
         net.tet_embed = torch.nn.Embedding(*new_embedding_weights.shape)
         net.tet_embed.load_state_dict({"weight": new_embedding_weights})
+        net.tet_embed.to(old_embedding.device)
 
         self.curr_tetrahedrons = new_tetrahedrons
 
@@ -717,6 +788,9 @@ class QuarTet:
         for tet in self.curr_tetrahedrons:
             tet.calculate_half_faces(force=True)
 
+    def fill_occupancy_with_sdf(self):
+        """ leave it to nitzan"""
+
 
 if __name__ == '__main_1_':
     # a = QuarTet(2, 'cpu')
@@ -727,8 +801,26 @@ if __name__ == '__main_1_':
     pc = PointCloud()
     pc.load_file('./filled_sphere.obj')
 
-if __name__ == '__main__':
-    a = QuarTet('../checkpoints/default_name/quartet_100.tet')
+if __name__ == '__main_1_':
+    a = QuarTet('../objects/cube_0.05.tet')
+    a.fill_sphere()
     a.export_mesh('./mesh.obj')
     a.export_point_cloud('./pc.obj', 10000)
     print(a.vertices)
+
+if __name__ == '__main__':
+    import networks
+
+    a = QuarTet('../objects/cube_0.15.tet', device='cuda')
+    net = networks.OurNet(None, 402).cuda()
+
+    s = time.time()
+    a.subdivide_tets(net)
+    print(f"Time to subdivide {time.time() - s}")
+    s = time.time()
+    net(a)
+    print(f"net applied {time.time() - s}")
+    s = time.time()
+    a.fix_at_position()
+    print(f"position fixed {time.time() - s}")
+    print(len(a.curr_tetrahedrons))

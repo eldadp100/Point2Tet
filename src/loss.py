@@ -1,3 +1,5 @@
+import math
+
 import torch
 from chamferdist import ChamferDistance
 from weighted_chamferdist import ChamferDistance as Weighted_CD
@@ -39,10 +41,42 @@ def chamfer_dist_with_weights_2(tetrahedrons_centers, ground_truth_point_cloud, 
 def vertices_movement_bound_loss(quartet):
     loss_1 = torch.tensor(0.)
     for v in quartet.vertices:
+        loss_v = torch.tensor(0.)
         sd = v.last_update_signed_distance
-        loss_1 = loss_1 + torch.max(sd, torch.tensor(0.))
+        for a, b in zip(*sd):  # TODO: a,b ...
+            loss_v = loss_v + torch.max(a, b / 4) - b / 4  # (we treat the b/2 as constant)
+        loss_1 += loss_v / len(sd)
     # loss_1 /= len(quartet)
+
     return loss_1
+
+
+#
+# def quartet_angles_loss(quartet):
+#     _loss = torch.tensor(0.)
+#     for tet in quartet:
+#         v = tet.vertices[0]
+#         v_hfs = tet.faces_by_vertex[v.get_original_xyz()]
+#         for hf1 in v_hfs:
+#             for hf2 in v_hfs:
+#                 if hf1 != hf2:
+#                     dot_product = torch.dot(hf1.plane.get_normal(), hf2.plane.get_normal())
+#                     _loss += torch.tensor(0.86) - torch.min(dot_product, torch.tensor(0.86))
+#     return _loss
+#
+def quartet_angles_loss(quartet):
+    min_angle_cos = torch.tensor(math.cos(math.pi / 6))
+
+    _loss = torch.tensor(0.)
+    for tet in quartet:
+        vs = [v.curr_loc for v in tet.vertices]
+        for i in range(4):
+            vectors = [vs[j] - vs[i] for j in range(4) if i != j]
+            for k1 in range(3):
+                for k2 in range(k1 + 1, 3):
+                    dp = torch.dot(vectors[k1], vectors[k2]) / torch.sqrt(torch.norm(vectors[k1]) * torch.norm(vectors[k2]))
+                    _loss += torch.max(dp, min_angle_cos) - min_angle_cos
+    return _loss
 
 
 def volumes_loss(quartet):
@@ -74,6 +108,7 @@ def loss(quartet, pc):
     loss_monitor = {
         "vertices_movements_chamfer_loss": (1., vertices_movements_chamfer_loss(quartet_pts_1, pc)),
         "vertices_movement_bound_loss": (1., vertices_movement_bound_loss(quartet)),
+        "quartet_angles_loss": (1., quartet_angles_loss(quartet)),
         "volumes_loss": (0.3, volumes_loss(quartet)),
         "occupancy_chamfer_loss": (0., occupancy_chamfer_loss(quartet_pts_2, pc, centers_weights)),
         # "occupancy_chamfer_loss_2": (0., occupancy_chamfer_loss_2(quartet_pts_3, pc, centers_weights))

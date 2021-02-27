@@ -45,17 +45,24 @@ class TetsGroupSharesVertex:
         if tet is not None:
             TetsGroupSharesVertex.time_monitor["query_direction"][0] += 1
             TetsGroupSharesVertex.time_monitor["query_direction"][1] += time.time() - start_time
-            return tet.faces_by_vertex_opposite[self.v.get_original_xyz()].plane.signed_distance(
-                self.v.original_loc + direction)
+            return tet.faces_by_vertex_opposite[self.v.get_original_xyz()].plane.signed_distance(self.v.original_loc + direction), tet.faces_by_vertex_opposite[self.v.get_original_xyz()].plane.signed_distance(self.v.original_loc)
         else:
             TetsGroupSharesVertex.counter += 1
             if TetsGroupSharesVertex.counter % 100 == 0:
                 print(TetsGroupSharesVertex.counter)
 
-            return torch.tensor(0.)
+            return torch.tensor(0.), torch.tensor(0.)
 
     def update_tets_list(self, to_remove, to_add):
         for _to_remove in to_remove:
             self.tets_list.remove(_to_remove)
         for _to_add in to_add:
             self.tets_list.append(_to_add)
+
+
+
+if __name__ == '__main__':
+    import quartet
+    a = quartet.QuarTet('../objects/cube_0.15.tet')
+    x = a.vertices[50]
+
