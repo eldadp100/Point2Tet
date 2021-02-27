@@ -4,8 +4,11 @@ import numpy as np
 import mesh
 from mesh_to_sdf.surface_point_cloud import SurfacePointCloud
 import pyrender
+import trimesh
+from scipy.spatial import ConvexHull
 
 from _utils import read_pts
+
 
 class PointCloud:
     def __init__(self):
@@ -75,6 +78,29 @@ class PointCloud:
 
     def __iter__(self):
         return self.points.__iter__()
+
+    def convex_hull(self, filename=None, return_trimesh=False):
+        hull = ConvexHull(np.array(self.points))
+        if filename is not None:
+            points = []
+            for point in hull.points:
+                x, y, z = point
+                points.append(f"v {x} {y} {z}")
+
+            faces = []
+            for face in hull.neighbors:
+                x, y, z = face
+                faces.append(f"f {x} {y} {z}")
+
+            with open(filename, "w") as file:
+                file.write('\n'.join(points))
+                file.write('\n')
+                file.write('\n'.join(faces))
+
+        if return_trimesh:
+            return trimesh.Trimesh(vertices=hull.points, faces=hull.simplices)
+        else:
+            return hull
 
 
 if __name__ == "__main__":

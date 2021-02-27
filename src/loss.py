@@ -3,6 +3,7 @@ import math
 import torch
 from chamferdist import ChamferDistance
 from weighted_chamferdist import ChamferDistance as Weighted_CD
+import numpy as np
 
 
 def pure_chamfer_dist(src_pc, dst_pc):
@@ -101,17 +102,29 @@ def occupancy_chamfer_loss_2(quartet_pts, pc, centers_weights):
     return chamfer_loss
 
 
-def loss(quartet, pc):
-    quartet_pts_1 = quartet.sample_point_cloud(pc.shape[0])
-    quartet_pts_2, centers_weights = quartet.sample_point_cloud_2(pc.shape[0])
-    quartet_pts_3, centers_weights = quartet.sample_point_cloud_2(2 * pc.shape[0])
+def occupancy_loss_with_sdf(quartet, sdf):
+    ground_truth = 1. - torch.tensor(np.ceil(sdf))
+    occupancies = torch.cat([tet.occupancy.to('cpu') for tet in quartet])
+    # calculating the binary cross entropy as described in the DefTet paper
+    return torch.nn.BCELoss(reduction='sum')(occupancies, ground_truth)
+
+
+def loss(quartet, pc, pc_points):
+    quartet_pts_1 = quartet.sample_point_cloud(pc_points.shape[0])
+    quartet_pts_2, centers_weights = quartet.sample_point_cloud_2(pc_points.shape[0])
+    quartet_pts_3, centers_weights = quartet.sample_point_cloud_2(2 * pc_points.shape[0])
+
+    queries = quartet.get_centers()
+    sdf = pc.calc_sdf(queries)
+
     loss_monitor = {
-        "vertices_movements_chamfer_loss": (1., vertices_movements_chamfer_loss(quartet_pts_1, pc)),
+        "vertices_movements_chamfer_loss": (1., vertices_movements_chamfer_loss(quartet_pts_1, pc_points)),
         "vertices_movement_bound_loss": (1., vertices_movement_bound_loss(quartet)),
         "quartet_angles_loss": (1., quartet_angles_loss(quartet)),
         "volumes_loss": (0.3, volumes_loss(quartet)),
-        "occupancy_chamfer_loss": (0., occupancy_chamfer_loss(quartet_pts_2, pc, centers_weights)),
+        "occupancy_chamfer_loss": (0., occupancy_chamfer_loss(quartet_pts_2, pc_points, centers_weights)),
         # "occupancy_chamfer_loss_2": (0., occupancy_chamfer_loss_2(quartet_pts_3, pc, centers_weights))
+        "occupancy_loss": (1., occupancy_loss_with_sdf(quartet, sdf))
     }
 
     return sum([lambda_i * loss_i for lambda_i, loss_i in loss_monitor.values()]), loss_monitor

@@ -6,6 +6,7 @@ import random
 from pointcloud import PointCloud
 import itertools
 from scipy.linalg import null_space
+from mesh_to_sdf import mesh_to_sdf
 
 from tetrahedral_group import TetsGroupSharesVertex
 import os
@@ -228,24 +229,6 @@ class Tetrahedron:
         return ret_tets, center
 
 
-def calculate_and_update_neighborhood(tetrahedrons, vertices):
-    vertices_to_tets_dict = dict()
-    for vertex in vertices:
-        vertices_to_tets_dict[vertex] = set()
-    for tet in tetrahedrons:
-        for vertex in tet:
-            vertices_to_tets_dict[vertex].add(tet)
-
-    for tet in tetrahedrons:
-        for face in tet.get_faces():
-            neighbor_set = set.intersection(*[vertices_to_tets_dict[vertex] for vertex in face])
-            assert (len(neighbor_set) == 1 or len(neighbor_set) == 2)
-            for neighbor in neighbor_set:
-                if neighbor != tet:
-                    neighbor.add_neighbor(tet)
-                    tet.add_neighbor(neighbor)
-
-
 def vertices_intersection(ver1, ver2):
     intersection = []
     for v1 in ver1:
@@ -414,13 +397,30 @@ class Vertex:
 
 
 class QuarTet:
-    def __init__(self, path='../cube_0.05.tet', device='cpu'):
+    def __init__(self, path='../cube_0.05.tet', device='cpu', metadata_path=None):
         self.curr_tetrahedrons = None
         self.vertices = None
-        self.load(path, device)
+        self.load(path, device, meta_data_path=metadata_path)
 
         self.last_vertex_update_average = None
         self.device = device
+
+    def calculate_and_update_neighborhood(self):
+        vertices_to_tets_dict = dict()
+        for vertex in self.vertices:
+            vertices_to_tets_dict[vertex] = set()
+        for tet in self.curr_tetrahedrons:
+            for vertex in tet:
+                vertices_to_tets_dict[vertex].add(tet)
+
+        for tet in self.curr_tetrahedrons:
+            for face in tet.get_faces():
+                neighbor_set = set.intersection(*[vertices_to_tets_dict[vertex] for vertex in face])
+                assert (len(neighbor_set) == 1 or len(neighbor_set) == 2)
+                for neighbor in neighbor_set:
+                    if neighbor != tet:
+                        neighbor.add_neighbor(tet)
+                        tet.add_neighbor(neighbor)
 
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
@@ -488,8 +488,11 @@ class QuarTet:
             else:
                 tet.occupancy = torch.tensor(0.)
 
-    def sample_point_cloud(self, pc_size):
+    def update_occupancy_using_convex_hull(self, convex_hull_mesh):
+        signs = mesh_to_sdf(convex_hull_mesh, np.array(self.get_centers()))
+        self.update_occupancy_using_sdf(signs)
 
+    def sample_point_cloud(self, pc_size):
         samples_weights = []
         for tet in self.curr_tetrahedrons:
             samples_weights.append((tet.center().curr_loc, tet.occupancy))  # grad of 1
@@ -570,63 +573,53 @@ class QuarTet:
     #         samples.append(little_qube)
     #     return torch.cat(samples)
 
-    def export(self, path, export_occupancies=True):
-        with open(path, "w") as output_file:
-            vertex_to_idx = {}
-            n_ver = 0
-            to_write = []
-            occupancies_str = []
-            for tet in self.curr_tetrahedrons:
+    def export_metadata(self, path):
+        occupancies_str = []
+        neighborhoods_str = []
+        for tet in self.curr_tetrahedrons:
+            occupancies_str.append(f"{tet.occupancy.item()}\n")
+            neighborhoods_str.append(', '.join([str(neighbor.tet_num.item()) for neighbor in tet.neighborhood]))
+
+        with open(path, 'w') as output_file:
+            output_file.write("occupancies:\n")
+            output_file.write(''.join(occupancies_str))
+            output_file.write("neighborhoods:\n")
+            output_file.write('\n'.join(neighborhoods_str))
+
+    def export_tet(self, path, export_only_filled=False):
+        vertex_to_idx = {}
+        n_ver = 0
+        to_write = []
+        for tet in self.curr_tetrahedrons:
+            if not export_only_filled or tet.occupancy > 0.5:
                 for v in tet.vertices:
                     if v not in vertex_to_idx:
                         x, y, z = v.curr_loc
                         to_write.append(f"{x} {y} {z}\n")
                         vertex_to_idx[v] = n_ver
                         n_ver += 1
-
-            for tet in self.curr_tetrahedrons:
+        for tet in self.curr_tetrahedrons:
+            if not export_only_filled or tet.occupancy > 0.5:
                 indices = [vertex_to_idx[v] for v in tet.vertices]
                 to_write.append(f"{indices[0]} {indices[1]} {indices[2]} {indices[3]}\n")
-                occupancies_str.append(f"{tet.occupancy}\n")
-
+        with open(path, "w") as output_file:
             output_file.write(f"tet {n_ver} {len(self.curr_tetrahedrons)}\n")
             output_file.write(''.join(to_write))
+
+
+    def export(self, path, export_metadata=True):
+        # exporting all the tetrahedrons
+        self.export_tet(path)
 
         name_without_extension, extension = os.path.splitext(path)
-        with open(f'{name_without_extension}_occupancies.occ', 'w') as output_file:
-            output_file.write(''.join(occupancies_str))
+        # exporting the metadata
+        if export_metadata:
+            self.export_metadata(f'{name_without_extension}_data.data')
 
-        with open(f'{name_without_extension}_filled{extension}', 'w') as output_file:
-            vertex_to_idx = {}
-            n_ver = 0
-            to_write = []
-            for tet in self.curr_tetrahedrons:
-                if tet.occupancy > 0.5:
-                    for v in tet.vertices:
-                        if v not in vertex_to_idx:
-                            x, y, z = v.curr_loc
-                            to_write.append(f"{x} {y} {z}\n")
-                            vertex_to_idx[v] = n_ver
-                            n_ver += 1
+        # exporting only the occupied tetrahedrons
+        self.export_tet(f'{name_without_extension}_filled{extension}', export_only_filled=True)
 
-            for tet in self.curr_tetrahedrons:
-                if tet.occupancy > 0.5:
-                    indices = [vertex_to_idx[v] for v in tet.vertices]
-                    to_write.append(f"{indices[0]} {indices[1]} {indices[2]} {indices[3]}\n")
-
-            output_file.write(f"tet {n_ver} {len(self.curr_tetrahedrons)}\n")
-            output_file.write(''.join(to_write))
-
-    def load(self, path, device, occupancies_path=None):
-        """
-        Loads a quartet from a file
-        :param path: the path to the quartet file in .tet format
-        :param device: the device to move the quartet to (e.g. 'cpu', 'cuda')
-        :param occupancies_path: an optional parameter representing a path to a file containing the occupancies
-                values of each tetrahedron. if 'default', the method uses the default name used the the quartet
-                while saving, if None no file is loaded and using default tetrahedron occupancies initialization
-        :return: None
-        """
+    def load_tetrahedrons(self, path):
         self.curr_tetrahedrons = []
         vertices = []
         with open(path, "r") as input_file:
@@ -652,18 +645,56 @@ class QuarTet:
                 if i % 2000 == 0 and i > 0:
                     print(f'Read {i} tetrhedrons')
 
-        if occupancies_path is not None:
-            print("Load occupancies")
-            if occupancies_path == 'default':
+
+    def load_meta_data(self, path, device='cpu'):
+        with open(path, 'r') as meta_data_input:
+            if next(meta_data_input).strip() != "occupancies:":
+                raise IOError("Wrong file content format")
+            try:
+                quartet_iter = iter(self)
+                next_line = next(meta_data_input).strip()
+                while next_line != "neighborhoods:":
+                    tet = next(quartet_iter)
+                    tet.occupancy = torch.tensor(float(next_line), device=device)
+                    next_line = next(meta_data_input).strip()
+
+                next_line = next(meta_data_input).strip()
+                for tet in self:
+                    curr_neighborhood = []
+                    neighbor_indexes = next_line.split(', ')
+                    for idx in neighbor_indexes:
+                        curr_neighborhood.append(self.curr_tetrahedrons[int(idx)])
+                    tet.neighborhood = curr_neighborhood.copy()
+                    next_line = next(meta_data_input).strip()
+
+            except StopIteration:
+                pass
+
+
+    def load(self, path, device, meta_data_path=None):
+        """
+        Loads a quartet from a file
+        :param path: the path to the quartet file in .tet format
+        :param device: the device to move the quartet to (e.g. 'cpu', 'cuda')
+        :param meta_data_path: an optional parameter representing a path to a file containing the metadata of the quartet
+                object, containing occupancies values of each tetrahedron and the neighborhoods of each tetrahedron.
+                if 'default', the method uses the default name used the the quartet while saving, if None no file is
+                loaded and initialization is done using default tetrahedron occupancies initialization and manual
+                neighborhoods calculaction
+        :return: None
+        """
+        self.load_tetrahedrons(path)
+
+        if meta_data_path is not None:
+            print("Loading metadata")
+            if meta_data_path == 'default':
                 base_name = os.path.splitext(path)[0]
-                occupancies_path = f"{base_name}_occupancies.occ"
+                meta_data_path = f"{base_name}_data.data"
 
-            if os.path.exists(occupancies_path):
-                with open(occupancies_path, 'r') as occupancies_input:
-                    for occ, tet in zip(occupancies_input, self.curr_tetrahedrons):
-                        tet.occupancy = torch.tensor(float(occ))
-
-        self.do_init_calculations()
+            if os.path.exists(meta_data_path):
+                self.load_meta_data(meta_data_path, device)
+        else:
+            self.do_init_calculations()
 
         for tet in self.curr_tetrahedrons:
             tet.occupancy = tet.occupancy.cpu()
@@ -673,14 +704,17 @@ class QuarTet:
             for i in range(4):
                 tet.vertices[i].curr_loc = tet.vertices[i].curr_loc.cpu()
 
+        self.init_setup()
+
     def do_init_calculations(self):
         print('Calculating neighborhoods')
-        calculate_and_update_neighborhood(self.curr_tetrahedrons, self.vertices)
+        self.calculate_and_update_neighborhood()
         print('Filling neighbors')
         self.fill_neighbors()
         print('Merge same vertices')
         self.merge_same_vertices()
 
+    def init_setup(self):
         for tet in self.curr_tetrahedrons:
             tet.features.requires_grad_()
 

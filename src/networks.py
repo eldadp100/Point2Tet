@@ -120,7 +120,7 @@ class OurNet(nn.Module):
             tet.update_move_signed_distance(tets_movements[i])
         for i, tet in enumerate(mother_cube):
             tet.update_by_deltas(tets_movements[i])
-            # tet.occupancy = tets_occupancy[i]
+            tet.occupancy = tets_occupancy[i]
 
     #
     # def forward(self, mother_cube):

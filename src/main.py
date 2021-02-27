@@ -29,24 +29,14 @@ def init_environment(opts):
     if not os.path.exists(checkpoint_folder):
         os.mkdir(checkpoint_folder)
 
-    return checkpoint_folder
+    target_path = os.path.join(checkpoint_folder, 'target_objects')
+    if not os.path.exists(target_path):
+        os.mkdir(target_path)
 
+    if not os.path.exists(opts.cache_folder):
+        os.mkdir(opts.cache_folder)
 
-def plot_grad_flow(named_parameters):
-    ave_grads = []
-    layers = []
-    for n, p in named_parameters:
-        if p.requires_grad and ("bias" not in n):
-            layers.append(n)
-            ave_grads.append(p.grad.abs().mean())
-    plt.plot(ave_grads, alpha=0.3, color="b")
-    plt.hlines(0, 0, len(ave_grads) + 1, linewidth=1, color="k")
-    plt.xticks(range(0, len(ave_grads), 1), layers, rotation="vertical")
-    plt.xlim(xmin=0, xmax=len(ave_grads))
-    plt.xlabel("Layers")
-    plt.ylabel("average gradient")
-    plt.title("Gradient flow")
-    plt.grid(True)
+    return checkpoint_folder, target_path
 
 
 def save_information(opts, i, net, optimizer, quartet):
@@ -68,20 +58,27 @@ def save_information(opts, i, net, optimizer, quartet):
     out_mesh_file_path = f"{opts.checkpoint_folder}/{opts.name}/mesh_{i}.obj"
 
     with open(f"{opts.checkpoint_folder}/{opts.name}/iter_num.txt", "w") as iter_num_file:
-        iter_num_file.write(f"{i}")  # overide (32 bits)
+        iter_num_file.write(f"{i}")  # override (32 bits)
 
     quartet.export_point_cloud(out_pc_file_path, 2500)
     quartet.export(out_quartet_file_path)
     quartet.export_mesh(out_mesh_file_path)
 
 
-init_environment(opts)
+checkpoint_folder, target_path = init_environment(opts)
+init_cube_prefix, _ = os.path.splitext(os.path.basename(opts.init_cube))
+quartet_cache_name = f'{init_cube_prefix}_quartet_data.data'
+quartet_data_cache = os.path.join(opts.cache_folder, quartet_cache_name)
 
-start_creating_quartet = time.time()
-print("start creating quartet")
-quartet = QuarTet(opts.init_cube, device)
-quartet.fill_sphere()
-print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
+if os.path.exists(quartet_data_cache):
+    print(f'found quartet data cache, loading quartet metadata from file: {quartet_data_cache}')
+    quartet = QuarTet(opts.init_cube, metadata_path=quartet_data_cache, device=device)
+else:
+    start_creating_quartet = time.time()
+    print("start creating quartet")
+    quartet = QuarTet(opts.init_cube, device)
+    print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
+    quartet.export_metadata(quartet_data_cache)
 
 # input filled point cloud
 # input_xyz, input_normals = torch.rand(100, 3, device=device), torch.rand(100, 3, device=device
@@ -94,6 +91,12 @@ original_input_xyz = pc.points
 
 quartet_sdf = pc.calc_sdf(quartet.get_centers())
 quartet.update_occupancy_using_sdf(quartet_sdf)
+
+print("Creating target objects:")
+quartet.export(path=os.path.join(target_path, 'target_quartet.tet'))
+quartet.export_mesh(path=os.path.join(target_path, 'target_mesh.obj'))
+quartet.export_point_cloud(path=os.path.join(target_path, 'target_pc.obj'), n=int(1e4))
+print("Finished")
 
 # This is how you visualize the occupied tets pc!
 # pts = quartet.get_occupied_centers()
@@ -134,7 +137,7 @@ for i in range(range_init, opts.iterations + range_init + 1):
     # input_xyz = original_input_xyz[indices]
     # TODO: Subdivide every opts.upsamp
     net(quartet)  # in place changes
-    _loss, loss_monitor = loss.loss(quartet, input_xyz)
+    _loss, loss_monitor = loss.loss(quartet, pc, input_xyz)
     print({k: f"{v[1].item() :.5f}" for k, v in loss_monitor.items()})
 
     if i % 100 == 0:
@@ -179,7 +182,7 @@ for i in range(range_init, opts.iterations + range_init + 1):
 
     # scheduler.step()
 
-    if i % opts.save_freq == 0:
+    if i % opts.save_freq == 0 and i > 0:
         save_information(opts, i, net, optimizer, quartet)
 
     if i - last_subdivide > subdivide_spaces and loss_monitor["quartet_angles_loss"][1] == 0. and loss_monitor[
