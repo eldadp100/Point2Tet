@@ -14,7 +14,9 @@ class Options:
         parser.add_argument('--checkpoint_folder', type=str, default="../checkpoints", help='')
         parser.add_argument('--init_cube', type=str, default="../objects/cube_0.15.tet", help='.tet format')
         parser.add_argument('--input_filled_pc', type=str, default='../objects/filled_sphere.obj', help='.obj format')
+        parser.add_argument('--input_pc', type=str, default='../objects/sphere.ply', help='input point cloud with normals in .ply format')
         parser.add_argument('--iteration_number', type=int, default=-1, help='the number of iteration to continue from in case of using --continue_train')
+        parser.add_argument('--cache_folder', type=str, default='../quartet_cache', help='a folder containing initial quartet objects for faster loading times')
 
         # HYPER PARAMETERS - RECONSTRUCTION
         parser.add_argument('--torch-seed', type=int, metavar='N', default=5, help='torch random seed')

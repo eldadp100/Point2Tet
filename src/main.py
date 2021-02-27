@@ -1,121 +1,3 @@
-# import shutil
-# import torch
-# from networks import init_net
-# import loss
-# from options import Options
-# import time
-# from quartet import QuarTet
-# from pointcloud import PointCloud
-# import numpy as np
-# import os
-#
-# options = Options()
-# opts = options.args
-# torch.manual_seed(opts.torch_seed)
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# # device = torch.device('cpu')
-# print('device: {}'.format(device))
-#
-#
-# def init_environment(opts):
-#     if not os.path.exists(opts.checkpoint_folder):
-#         os.mkdir(opts.checkpoint_folder)
-#
-#     checkpoint_folder = f"{opts.checkpoint_folder}/{opts.name}"
-#     if os.path.exists(checkpoint_folder):
-#         shutil.rmtree(checkpoint_folder)
-#     time.sleep(0.1)
-#     os.mkdir(checkpoint_folder)
-#
-#     return checkpoint_folder
-#
-#
-# init_environment(opts)
-#
-# start_creating_quartet = time.time()
-# print("start creating quartet")
-# quartet = QuarTet(opts.init_cube, device)
-# print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
-#
-# # input filled point cloud
-# # input_xyz, input_normals = torch.rand(100, 3, device=device), torch.rand(100, 3, device=device)
-# pc = PointCloud()
-# pc.load_file(opts.input_filled_pc)
-# pc.normalize()
-# original_input_xyz = pc.points
-#
-# net, optimizer, scheduler = init_net(opts, device)
-#
-# print(f'opts.continue_train = {opts.continue_train}')
-# print(f'opts.save_freq = {opts.save_freq}')
-#
-#
-# def save_run(i):
-#     global net, optimizer, scheduler, opts
-#
-#     if os.path.isfile(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt'):
-#         os.rename(f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt',
-#                   f'{opts.checkpoint_folder}/{opts.name}/model_checkpoint_{i - opts.save_freq}.pt')
-#
-#     checkpoint_file_path = f"{opts.checkpoint_folder}/{opts.name}/model_checkpoint_latest.pt"
-#     out_pc_file_path = f"{opts.checkpoint_folder}/{opts.name}/point_clouds/pc_{i}.obj"
-#     out_quartet_file_path = f"{opts.checkpoint_folder}/{opts.name}/quartets/quartet_{i}.obj"
-#     out_mesh_file_path = f"{opts.checkpoint_folder}/{opts.name}/meshes/mesh_{i}.obj"
-#
-#     state_dict = {
-#         "net": net.state_dict(),
-#         "optim": optimizer.state_dict()
-#     }
-#
-#     print('saving model')
-#     torch.save(state_dict, checkpoint_file_path)
-#
-#     print('exporting point cloud')
-#     try:
-#         quartet.export_point_cloud(out_pc_file_path, 25000)
-#     except IOError:
-#         pass
-#
-#     print('saving quartet')
-#     try:
-#         quartet.export(out_quartet_file_path)
-#     except IOError:
-#         pass
-#
-#     print('exporting mesh')
-#     try:
-#         quartet.export_mesh(out_mesh_file_path)
-#     except IOError:
-#         pass
-#
-#
-# for i in range(opts.iterations):
-#     print(f"iteration {i} starts")
-#     iter_start_time = time.time()
-#
-#     # sample different points every iteration
-#     chamfer_sample_size = min(original_input_xyz.shape[0], opts.chamfer_samples)
-#     indices = np.random.randint(0, original_input_xyz.shape[0], chamfer_sample_size)
-#     input_xyz = original_input_xyz[indices]
-#
-#     # TODO: Subdivide every opts.upsamp
-#     net(quartet)  # in place changes
-#     _loss = loss.loss(quartet, input_xyz, n=chamfer_sample_size)
-#     optimizer.zero_grad()
-#     _loss.backward()
-#     optimizer.step()
-#     print(_loss)
-#     # scheduler.step()
-#     if i != 0 and i % opts.save_freq == 0:
-#         save_run(i)
-#
-#     quartet.zero_grad()
-#     quartet.reset()
-#     print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
-#
-# save_run(opts.iterations)
-# print(_loss)
-
 import shutil
 import torch
 from networks import init_net
@@ -126,6 +8,7 @@ from quartet import QuarTet
 from pointcloud import PointCloud
 import numpy as np
 import os
+import sys
 
 import matplotlib.pyplot as plt
 import visualizer
@@ -149,45 +32,45 @@ def init_environment(opts):
     if not os.path.exists(checkpoint_folder):
         os.mkdir(checkpoint_folder)
 
-    return checkpoint_folder
+    target_path = os.path.join(checkpoint_folder, 'target_objects')
+    if not os.path.exists(target_path):
+        os.mkdir(target_path)
+
+    if not os.path.exists(opts.cache_folder):
+        os.mkdir(opts.cache_folder)
+
+    return checkpoint_folder, target_path
 
 
-def plot_grad_flow(named_parameters):
-    ave_grads = []
-    layers = []
-    for n, p in named_parameters:
-        if p.requires_grad and ("bias" not in n):
-            layers.append(n)
-            ave_grads.append(p.grad.abs().mean())
-    plt.plot(ave_grads, alpha=0.3, color="b")
-    plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k" )
-    plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
-    plt.xlim(xmin=0, xmax=len(ave_grads))
-    plt.xlabel("Layers")
-    plt.ylabel("average gradient")
-    plt.title("Gradient flow")
-    plt.grid(True)
+checkpoint_folder, target_path = init_environment(opts)
+init_cube_prefix, _ = os.path.splitext(os.path.basename(opts.init_cube))
+quartet_cache_name = f'{init_cube_prefix}_quartet_data.data'
+quartet_data_cache = os.path.join(opts.cache_folder, quartet_cache_name)
 
-
-init_environment(opts)
-
-start_creating_quartet = time.time()
-print("start creating quartet")
-quartet = QuarTet(opts.init_cube, device)
-quartet.fill_sphere()
-print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
-
-# input filled point cloud
-# input_xyz, input_normals = torch.rand(100, 3, device=device), torch.rand(100, 3, device=device
+if os.path.exists(quartet_data_cache):
+    print(f'found quartet data cache, loading quartet metadata from file: {quartet_data_cache}')
+    quartet = QuarTet(opts.init_cube, metadata_path=quartet_data_cache, device=device)
+else:
+    start_creating_quartet = time.time()
+    print("start creating quartet")
+    quartet = QuarTet(opts.init_cube, device)
+    print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
+    quartet.export_metadata(quartet_data_cache)
 
 pc = PointCloud()
 # pc.load_file(opts.input_filled_pc)
-pc.load_with_normals("../objects/g.ply")
+pc.load_with_normals(opts.input_pc)
 pc.normalize()
 original_input_xyz = pc.points
 
 quartet_sdf = pc.calc_sdf(quartet.get_centers())
 quartet.update_occupancy_using_sdf(quartet_sdf)
+
+print("Creating target objects:")
+quartet.export(path=os.path.join(target_path, 'target_quartet.tet'))
+quartet.export_mesh(path=os.path.join(target_path, 'target_mesh.obj'))
+quartet.export_point_cloud(path=os.path.join(target_path, 'target_pc.obj'), n=int(1e4))
+print("Finished")
 
 # This is how you visualize the occupied tets pc!
 # pts = quartet.get_occupied_centers()
@@ -222,7 +105,8 @@ for i in range(range_init, opts.iterations + 1):
     # input_xyz = original_input_xyz[indices]
     # TODO: Subdivide every opts.upsamp
     net(quartet)  # in place changes
-    _loss, loss_monitor = loss.loss(quartet, input_xyz)
+    # _loss, loss_monitor = loss.loss(quartet, input_xyz)
+    _loss, loss_monitor = loss.loss(quartet, pc)
     print({k: f"{v[1].item() :.5f}" for k, v in loss_monitor.items()})
 
     if i % 100 == 0:

@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import uuid
+import os.path
 
 
 def read_pts(pts_file):
@@ -70,8 +71,42 @@ def random_file_name(ext, prefix='temp'):
     return f'{prefix}{uuid.uuid4()}.{ext}'
 
 
+def export_obj(vertices, normals, filename):
+    with open(filename, 'w') as f:
+        if normals is not None:
+            for point, normal in zip(vertices, normals):
+                x, y, z = point
+                f.write(f"v {x.item()} {y.item()} {z.item()}\n")
+                xn, yn, zn = normal
+                f.write(f"vn {xn.item()} {yn.item()} {zn.item()}\n")
+        else:
+            for point in vertices:
+                x, y, z = point
+                f.write(f"v {x.item()} {y.item()} {z.item()}\n")
+
+
+def export_ply(vertices, normals, filename):
+    with open(filename, 'w') as f:
+        f.write(f"ply\nformat ascii 1.0\nelement vertex {len(vertices)}")
+        if normals is not None:
+            f.write('\nproperty double '.join(['', 'x', 'y', 'z', 'nx', 'ny', 'nz']))
+            # f.write('nz\n')
+        else:
+            f.write('\nproperty double '.join(['', 'x', 'y', 'z']))
+        f.write('\nend_header\n')
+        if normals is not None:
+            for point, normal in zip(vertices, normals):
+                x, y, z = point
+                xn, yn, zn = normal
+                f.write(f"{x.item()} {y.item()} {z.item()} {xn.item()} {yn.item()} {zn.item()}\n")
+        else:
+            for point in vertices:
+                x, y, z = point
+                f.write(f"{x.item()} {y.item()} {z.item()}\n")
+
+
 def create_torus_point_cloud(major_radius=0.5, minor_radius=None, aspect_ratio=3., offset=(0.5, 0.5, 0.), filename='torus.obj',
-                 N=int(1e4)):
+                 N=int(1e4), normals=True):
     """
     Creates a torus point cloud (only shell), and writes it to an .obj file
     :param major_radius: the major radius of the torus (the distance between center of donut's perimeter and the center of the donut)
@@ -80,6 +115,7 @@ def create_torus_point_cloud(major_radius=0.5, minor_radius=None, aspect_ratio=3
     :param offset: a tuple of size 3 containing offset to the torus on the x, y, z axis
     :param filename: the file name to export the created torus to; if None no file is created
     :param N: the number of points to sample
+    :param normals: if True exports the point cloud with normals
     :return: a torch.tensor containing the points (of shape [N, 3])
     """
     if minor_radius is None:
@@ -97,17 +133,50 @@ def create_torus_point_cloud(major_radius=0.5, minor_radius=None, aspect_ratio=3
             torch.tensor([minor_radius * st])
         ])
 
+    def get_normal(ct, cp, st, sp):
+        temp = minor_radius * ct
+        return torch.cat([
+            torch.tensor([temp * cp]),
+            torch.tensor([temp * sp]),
+            torch.tensor([minor_radius * st])
+        ])
+
+    cts, cps, sts, sps = np.cos(thetas), np.cos(phis), np.sin(thetas), np.sin(phis)
     result = torch.stack([get_point(ct, cp, st, sp) for ct, cp, st, sp in
-                          zip(np.cos(thetas), np.cos(phis), np.sin(thetas), np.sin(phis))])
+                          zip(cts, cps, sts, sps)])
     result += torch.tensor(offset)
+    # j is theta, i is phi
+    import time
+    if normals:
+        # start_time = time.time()
+        # cts, cps, sts, sps = map(torch.tensor, [cts, cps, sts, sps])
+        # cts, cps, sts, sps = map(lambda p: p.unsqueeze(dim=-1), [cts, cps, sts, sps])
+        # big_tangents = torch.cat([-1 * sts, cts, torch.zeros_like(sts)], dim=1)
+        # little_tangents = torch.cat([-1 * cts * sps, -1 * sts * sps, cps], dim=1)
+        # normal_vectors = torch.cross(big_tangents, little_tangents)
+        # print(f'First method run time = {time.time() - start_time}')
+        # start_time = time.time()
+        normal_vectors = torch.stack([get_normal(ct, cp, st, sp) for ct, cp, st, sp in
+                              zip(cts, cps, sts, sps)])
+        # print(f'Second method run time = {time.time() - start_time}')
+        # normal_vectors -= normal_vectors.mean(axis=1).unsqueeze(-1)
+        # normal_vectors /= normal_vectors.std(axis=1).unsqueeze(-1)
+
+
     if filename is not None:
-        with open(filename, 'w') as f:
-            for point in result:
-                x, y, z = point
-                f.write(f"v {x.item()} {y.item()} {z.item()}\n")
+        split = os.path.splitext(filename)
+        if len(split) > 1:
+            if split[1] == '.obj':
+                export_obj(result, normal_vectors, filename)
+            elif split[1] == '.ply':
+                export_ply(result, normal_vectors, filename)
+            else:
+                raise IOError("Error: File format not supported!")
+
     return result
 
 
 if __name__ == '__main__':
-    vs, faces = load_obj('../objects/cube.obj', normalize=True)
-    export('../objects/normalized_cube.obj', vs, faces)
+    # vs, faces = load_obj('../objects/cube.obj', normalize=True)
+    # export('../objects/normalized_cube.obj', vs, faces)
+    create_torus_point_cloud(filename='torus.ply')

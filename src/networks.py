@@ -5,6 +5,7 @@ import torch.nn as nn
 from torch import optim
 from quartet import QuarTet, Tetrahedron
 
+
 import os
 
 NEIGHBORHOOD_SIZE = 5
@@ -70,12 +71,12 @@ class OurNet(nn.Module):
         self.conv_net = TetCNN_PP(ncf)  # TetCNN++
 
         self.net_vertices_movements = nn.Sequential(
-            nn.Linear(ncf[-1], 128),
+            nn.Linear(ncf[0], 128),
             nn.ReLU(),
             nn.Linear(128, 12)
         )  # 3D movement
         self.net_occupancy = nn.Sequential(
-            nn.Linear(ncf[-1], 128),
+            nn.Linear(ncf[0], 128),
             nn.ReLU(),
             nn.Linear(128, 1)
         )  # Binary classifier - occupancy
@@ -106,21 +107,21 @@ class OurNet(nn.Module):
     def forward(self, mother_cube):
         for tet in mother_cube:
             tet.features = self.tet_embed(tet.tet_num)
-        self.conv_net(mother_cube)
+        # self.conv_net(mother_cube)
         tets_features = torch.stack([tet.features for tet in mother_cube])
 
-        tets_movements = self.net_vertices_movements(tets_features).reshape((-1, 4, 3)).cpu()
-        # tets_occupancy = torch.tanh(self.net_occupancy(tets_features)) / 2 + 0.5
-        tets_occupancy = torch.sigmoid(self.net_occupancy(tets_features))
+        # tets_movements = self.net_vertices_movements(tets_features).reshape((-1, 4, 3)).cpu()
+        tets_occupancy = torch.tanh(self.net_occupancy(tets_features)) / 2 + 0.5
+        # tets_occupancy = torch.sigmoid(self.net_occupancy(tets_features))
 
+        # for i, tet in enumerate(mother_cube):
+        #     for v in tet.vertices:
+        #         v.last_update_signed_distance = torch.tensor(0.)
+        # for i, tet in enumerate(mother_cube):
+        #     tet.update_move_signed_distance(tets_movements[i])
         for i, tet in enumerate(mother_cube):
-            for v in tet.vertices:
-                v.last_update_signed_distance = torch.tensor(0.)
-        for i, tet in enumerate(mother_cube):
-            tet.update_move_signed_distance(tets_movements[i])
-        for i, tet in enumerate(mother_cube):
-            tet.update_by_deltas(tets_movements[i])
-            # tet.occupancy = tets_occupancy[i]
+            # tet.update_by_deltas(tets_movements[i])
+            tet.occupancy = tets_occupancy[i]
 
     #
     # def forward(self, mother_cube):

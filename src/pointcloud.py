@@ -4,6 +4,9 @@ import numpy as np
 import mesh
 from mesh_to_sdf.surface_point_cloud import SurfacePointCloud
 import pyrender
+import trimesh
+from scipy.spatial import ConvexHull
+
 
 from _utils import read_pts
 
@@ -76,6 +79,29 @@ class PointCloud:
     def __iter__(self):
         return self.points.__iter__()
 
+    def convex_hull(self, filename=None, return_trimesh=False):
+        hull = ConvexHull(np.array(self.points))
+        if filename is not None:
+            points = []
+            for point in hull.points:
+                x, y, z = point
+                points.append(f"v {x} {y} {z}")
+
+            faces = []
+            for face in hull.neighbors:
+                x, y, z = face
+                faces.append(f"f {x} {y} {z}")
+
+            with open(filename, "w") as file:
+                file.write('\n'.join(points))
+                file.write('\n')
+                file.write('\n'.join(faces))
+
+        if return_trimesh:
+            return trimesh.Trimesh(vertices=hull.points, faces=hull.simplices)
+        else:
+            return hull
+
 
 if __name__ == "__main__":
     # device = 'cpu'
@@ -104,7 +130,11 @@ if __name__ == "__main__":
     # pc.write_to_file("pc.obj")
 
     pc = PointCloud()
-    pc.load_file('../objects/filled_sphere.obj')
+    pc.load_file('../objects/torus.obj')
+    hull = pc.convex_hull('torus_convex_hull.obj')
     xyz = pc.points
-    print(f'max points = {xyz.max(axis=0)}')
-    print(f'min points = {xyz.min(axis=0)}')
+
+    torus_convex_hull = trimesh.load("torus_convex_hull.obj")
+    # print(f'max points = {xyz.max(axis=0)}')
+    # print(f'min points = {xyz.min(axis=0)}')
+
