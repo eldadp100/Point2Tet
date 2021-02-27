@@ -469,6 +469,27 @@ class QuarTet:
         return len(self.curr_tetrahedrons)
 
     def get_centers(self):
+        centers = []
+        for tet in self.curr_tetrahedrons:
+            centers.append(tet.center().original_loc)
+        return torch.stack(centers)
+
+    def get_occupied_centers(self):
+        occupied_centers = []
+        for tet in self.curr_tetrahedrons:
+            if tet.occupancy >= 0.5:
+                occupied_centers.append(tet.center().original_loc)
+        return torch.stack(occupied_centers)
+
+    def update_occupancy_using_sdf(self, sdf):
+        for i, tet in enumerate(self.curr_tetrahedrons):
+            if sdf[i] <= 0:
+                tet.occupancy = torch.tensor(1.)
+            else:
+                tet.occupancy = torch.tensor(0.)
+
+    def sample_point_cloud(self, pc_size):
+
         samples_weights = []
         for tet in self.curr_tetrahedrons:
             samples_weights.append((tet.center().curr_loc, tet.occupancy))  # grad of 1
@@ -571,9 +592,30 @@ class QuarTet:
             output_file.write(f"tet {n_ver} {len(self.curr_tetrahedrons)}\n")
             output_file.write(''.join(to_write))
 
-        name_without_extension, _ = os.path.splitext(path)
+        name_without_extension, extension = os.path.splitext(path)
         with open(f'{name_without_extension}_occupancies.occ', 'w') as output_file:
             output_file.write(''.join(occupancies_str))
+
+        with open(f'{name_without_extension}_filled{extension}', 'w') as output_file:
+            vertex_to_idx = {}
+            n_ver = 0
+            to_write = []
+            for tet in self.curr_tetrahedrons:
+                if tet.occupancy > 0.5:
+                    for v in tet.vertices:
+                        if v not in vertex_to_idx:
+                            x, y, z = v.curr_loc
+                            to_write.append(f"{x} {y} {z}\n")
+                            vertex_to_idx[v] = n_ver
+                            n_ver += 1
+
+            for tet in self.curr_tetrahedrons:
+                if tet.occupancy > 0.5:
+                    indices = [vertex_to_idx[v] for v in tet.vertices]
+                    to_write.append(f"{indices[0]} {indices[1]} {indices[2]} {indices[3]}\n")
+
+            output_file.write(f"tet {n_ver} {len(self.curr_tetrahedrons)}\n")
+            output_file.write(''.join(to_write))
 
     def load(self, path, device, occupancies_path=None):
         """
@@ -621,6 +663,8 @@ class QuarTet:
                     for occ, tet in zip(occupancies_input, self.curr_tetrahedrons):
                         tet.occupancy = torch.tensor(float(occ))
 
+        self.do_init_calculations()
+
         for tet in self.curr_tetrahedrons:
             tet.occupancy = tet.occupancy.cpu()
             tet.features = tet.features.to(device)
@@ -628,8 +672,6 @@ class QuarTet:
             tet.prev_features = tet.prev_features.to(device)
             for i in range(4):
                 tet.vertices[i].curr_loc = tet.vertices[i].curr_loc.cpu()
-
-        self.do_init_calculations()
 
     def do_init_calculations(self):
         print('Calculating neighborhoods')
@@ -677,6 +719,14 @@ class QuarTet:
                     face_container = tuple(intersect(tet, nei))
                     if face_container not in faces:
                         faces.add(face_container)
+
+                # checking if the face is on the boundary and the tetrahedron is occupied
+                # and therefore is part of the mesh
+                if tet.occupancy > 0.5:
+                    for face in tet.get_faces():
+                        face_container = tuple(face)
+                        if face_container not in faces and all([v.on_boundary for v in face_container]):
+                            faces.add(face_container)
         return faces
 
     def export_mesh(self, path):
@@ -690,12 +740,13 @@ class QuarTet:
                 if v not in vertices:
                     vertices[v] = c
                     c += 1
-                x, y, z = v.curr_loc
-                obj_file_str_vert.append(f"v {x} {y} {z}")
+                    x, y, z = v.curr_loc
+                    obj_file_str_vert.append(f"v {x} {y} {z}")
             obj_file_str_faces.append(
                 f"f {vertices[f_coords[0]]} {vertices[f_coords[1]]} {vertices[f_coords[2]]}")
         with open(path, 'w+') as f:
             f.write("\n".join(obj_file_str_vert))
+            f.write("\n")
             f.write("\n".join(obj_file_str_faces))
 
     def export_point_cloud(self, path, n=2500):
@@ -788,18 +839,29 @@ class QuarTet:
         for tet in self.curr_tetrahedrons:
             tet.calculate_half_faces(force=True)
 
+
+
     def fill_occupancy_with_sdf(self):
         """ leave it to nitzan"""
 
 
+    def __getitem__(self, index):
+        return self.curr_tetrahedrons[index]
+
+
 if __name__ == '__main_1_':
     # a = QuarTet(2, 'cpu')
-    a = QuarTet('../objects/cube_0.1.tet')
+    a = QuarTet('../objects/cube_0.05.tet')
     a.fill_sphere()
-    a.export_point_cloud('./pc.obj', 10000)
+    # for tet in a:
+    #     tet.occupancy = torch.tensor(0.)
+    # a[5].occupancy = torch.tensor(1.)
+    # a.export_point_cloud('./pc.obj', 10000)
+    a.export_mesh('./mesh.obj')
+    a.export(path='quartet.tet')
 
-    pc = PointCloud()
-    pc.load_file('./filled_sphere.obj')
+    # pc = PointCloud()
+    # pc.load_file('./filled_sphere.obj')
 
 if __name__ == '__main_1_':
     a = QuarTet('../objects/cube_0.05.tet')
@@ -824,3 +886,9 @@ if __name__ == '__main__':
     a.fix_at_position()
     print(f"position fixed {time.time() - s}")
     print(len(a.curr_tetrahedrons))
+# if __name__ == '__main__':
+#     a = QuarTet('../checkpoints/default_name/quartet_100.tet')
+#     a.export_mesh('./mesh.obj')
+#     a.export_point_cloud('./pc.obj', 10000)
+#     print(a.vertices)
+

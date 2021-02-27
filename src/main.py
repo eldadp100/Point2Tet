@@ -84,11 +84,22 @@ quartet.fill_sphere()
 print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
 
 # input filled point cloud
-# input_xyz, input_normals = torch.rand(100, 3, device=device), torch.rand(100, 3, device=device)
+# input_xyz, input_normals = torch.rand(100, 3, device=device), torch.rand(100, 3, device=device
+
 pc = PointCloud()
-pc.load_file(opts.input_filled_pc)
+# pc.load_file(opts.input_filled_pc)
+pc.load_with_normals("../objects/g.ply")
 pc.normalize()
 original_input_xyz = pc.points
+
+quartet_sdf = pc.calc_sdf(quartet.get_centers())
+quartet.update_occupancy_using_sdf(quartet_sdf)
+
+# This is how you visualize the occupied tets pc!
+# pts = quartet.get_occupied_centers()
+# spc = PointCloud()
+# spc.init_with_points(pts)
+# visualizer.visualize_pointcloud(spc)
 
 # sample different points every iteration
 chamfer_sample_size = min(original_input_xyz.shape[0], opts.chamfer_samples)

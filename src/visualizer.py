@@ -1,24 +1,23 @@
 import open3d
 
-def visualize_quartet(quartets):
+def visualize_quartet(quartet):
     mesh = open3d.geometry.TetraMesh()
-    for quartet in quartets:
-        vertex_index = 0
-        vertices = []
-        tetras = []
+    vertex_index = 0
+    vertices = []
+    tetras = []
 
-        for tet in quartet:
-            tetra = []
-            for vert in tet.vertices:
-                vertices.append(vert.loc.cpu().detach().numpy())
-                tetra.append(vertex_index)
-                vertex_index += 1
-            tetras.append(tetra)
+    for tet in quartet:
+        tetra = []
+        for vert in tet.vertices:
+            vertices.append(vert.original_loc.cpu().detach().numpy())
+            tetra.append(vertex_index)
+            vertex_index += 1
+        tetras.append(tetra)
 
-        o3d_tetra_mesh = open3d.geometry.TetraMesh()
-        o3d_tetra_mesh.vertices.extend(vertices)
-        o3d_tetra_mesh.tetras.extend(tetras)
-        mesh += o3d_tetra_mesh
+    o3d_tetra_mesh = open3d.geometry.TetraMesh()
+    o3d_tetra_mesh.vertices.extend(vertices)
+    o3d_tetra_mesh.tetras.extend(tetras)
+    mesh += o3d_tetra_mesh
 
     open3d.visualization.draw_geometries([mesh], mesh_show_back_face=True)
 
