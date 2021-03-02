@@ -640,12 +640,13 @@ class QuarTet:
                     next_line = next(meta_data_input).strip()
 
                 next_line = next(meta_data_input).strip()
-                curr_neighborhood = []
+                quartet_iter = iter(self)
                 while True:
+                    curr_neighborhood = []
                     neighbor_indexes = next_line.split(', ')
                     for idx in neighbor_indexes:
                         curr_neighborhood.append(self.curr_tetrahedrons[int(idx)])
-                    next(quartet_iter).neighborhood = curr_neighborhood.copy()
+                    next(quartet_iter).neighborhood = curr_neighborhood
                     next_line = next(meta_data_input).strip()
 
             except StopIteration:
