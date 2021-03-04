@@ -108,7 +108,7 @@ def export_ply(vertices, normals, filename):
 def create_torus_point_cloud(major_radius=0.5, minor_radius=None, aspect_ratio=3., offset=(0.5, 0.5, 0.), filename='torus.obj',
                  N=int(1e4), normals=True):
     """
-    Creates a torus point cloud (only shell), and writes it to an .obj file
+    Creates a torus point cloud (only shell), and writes it to an .obj or .ply file
     :param major_radius: the major radius of the torus (the distance between center of donut's perimeter and the center of the donut)
     :param minor_radius: the minor radius of the torus (the radius of the donut's perimeter). if None determined by the major radius and the aspect ratio
     :param aspect_ratio: the ratio between major and minor radiuses (major / minor). if the minor radius is given this parameter is ignored
@@ -164,5 +164,6 @@ def create_torus_point_cloud(major_radius=0.5, minor_radius=None, aspect_ratio=3
 
 
 if __name__ == '__main__':
-    vs, faces = load_obj('../objects/cube.obj', normalize=True)
-    export('../objects/normalized_cube.obj', vs, faces)
+    # vs, faces = load_obj('../objects/cube.obj', normalize=True)
+    # export('../objects/normalized_cube.obj', vs, faces)
+    create_torus_point_cloud(filename="torus_pc.ply", normals=True)

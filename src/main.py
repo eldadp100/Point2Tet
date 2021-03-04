@@ -85,7 +85,7 @@ else:
 
 pc = PointCloud()
 # pc.load_file(opts.input_filled_pc)
-pc.load_with_normals("../objects/g.ply")
+pc.load_with_normals(opts.input_pc)
 pc.normalize()
 original_input_xyz = pc.points
 
@@ -111,7 +111,7 @@ input_xyz = original_input_xyz[indices]
 
 net, optimizer, scheduler = init_net(opts, len(quartet), device)
 
-subdivide_spaces = 200
+subdivide_spaces = opts.upsamp
 last_subdivide = 0
 max_subdivides = 10
 subdivide_up_to_now = 0

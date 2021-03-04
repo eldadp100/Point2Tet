@@ -81,9 +81,10 @@ def quartet_angles_loss(quartet):
 
 
 def volumes_loss(quartet):
-    volumes = [tet.volume().abs() for tet in quartet]
-    avg_vols = sum(volumes) / len(volumes)
-    tets_vols_loss = sum([(vol - avg_vols).abs() for vol in volumes]) / len(volumes)
+    volumes = torch.tensor([tet.volume() for tet in quartet])
+    num_tets = len(quartet.curr_tetrahedrons)
+    avg_vols = volumes.sum() / num_tets
+    tets_vols_loss = (volumes - avg_vols).abs().sum() / num_tets
     return tets_vols_loss
 
 
@@ -111,8 +112,8 @@ def occupancy_loss_with_sdf(quartet, sdf):
 
 def loss(quartet, pc, pc_points):
     quartet_pts_1 = quartet.sample_point_cloud(pc_points.shape[0])
-    quartet_pts_2, centers_weights = quartet.sample_point_cloud_2(pc_points.shape[0])
-    quartet_pts_3, centers_weights = quartet.sample_point_cloud_2(2 * pc_points.shape[0])
+    # quartet_pts_2, centers_weights = quartet.sample_point_cloud_2(pc_points.shape[0])
+    # quartet_pts_3, centers_weights = quartet.sample_point_cloud_2(2 * pc_points.shape[0])
 
     queries = quartet.get_centers()
     sdf = pc.calc_sdf(queries)
@@ -122,9 +123,9 @@ def loss(quartet, pc, pc_points):
         "vertices_movement_bound_loss": (1., vertices_movement_bound_loss(quartet)),
         "quartet_angles_loss": (1., quartet_angles_loss(quartet)),
         "volumes_loss": (0.3, volumes_loss(quartet)),
-        "occupancy_chamfer_loss": (0., occupancy_chamfer_loss(quartet_pts_2, pc_points, centers_weights)),
+        # "occupancy_chamfer_loss": (0., occupancy_chamfer_loss(quartet_pts_2, pc_points, centers_weights)),
         # "occupancy_chamfer_loss_2": (0., occupancy_chamfer_loss_2(quartet_pts_3, pc, centers_weights))
-        "occupancy_loss": (1., occupancy_loss_with_sdf(quartet, sdf))
+        # "occupancy_loss": (1., occupancy_loss_with_sdf(quartet, sdf))
     }
 
     return sum([lambda_i * loss_i for lambda_i, loss_i in loss_monitor.values()]), loss_monitor
