@@ -92,11 +92,11 @@ class OurNet(nn.Module):
         # tets_occupancy = torch.tanh(self.net_occupancy(tets_features)) / 2 + 0.5
         tets_occupancy = torch.sigmoid(self.net_occupancy(tets_features))
 
-        for i, tet in enumerate(mother_cube):
-            for v in tet.vertices:
-                v.last_update_signed_distance = [[], []]
+        for v in mother_cube.vertices:
+            v.last_update_signed_distance = []
         for i, tet in enumerate(mother_cube):
             tet.update_move_signed_distance(tets_movements[i])
+
         for i, tet in enumerate(mother_cube):
             tet.update_by_deltas(tets_movements[i])
             tet.occupancy = tets_occupancy[i]

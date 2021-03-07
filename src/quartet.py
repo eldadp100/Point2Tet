@@ -152,7 +152,6 @@ class Tetrahedron:
             if v not in face:
                 self.faces_by_vertex_opposite[v.get_original_xyz()] = new_half_face
 
-
     def calculate_half_faces(self, force=False):
         """ :param force: If True the half faces will be recalculated """
         if force:
@@ -231,6 +230,7 @@ class HalfFace:
     The class is called HalfFace because we use 2 of these to describe a single face,
     because we want to have two different normals for the same face.
     """
+
     def __init__(self, coords, tets):
         """
         :param coords: the three points describing the face
@@ -293,7 +293,7 @@ class Vertex:
         self.on_boundary = self.is_on_boundary()
 
         self.tets_group = None
-        self.last_update_signed_distance = [[], []]
+        self.last_update_signed_distance = []
 
     def is_on_boundary(self):
         for i in range(3):
@@ -303,9 +303,9 @@ class Vertex:
 
     def update_sd_loss(self, move_vector):
         if not self.on_boundary:
-            original_distance, new_distance = self.tets_group.signed_distance_to_face_in_direction(move_vector)
-            self.last_update_signed_distance[0].append(original_distance)
-            self.last_update_signed_distance[1].append(new_distance)
+            # original_distance = self.tets_group.signed_distance_to_face_in_direction(move_vector)
+            original_distance = self.tets_group.inner_sphere_loss(move_vector)
+            self.last_update_signed_distance.append(original_distance)
 
     def update_vertex(self, move_vector):
         if not self.on_boundary:
@@ -313,7 +313,7 @@ class Vertex:
 
     def reset(self):
         self.curr_loc = self.original_loc.detach().clone()
-        self.last_update_signed_distance = [[], []]
+        self.last_update_signed_distance = []
 
     def get_curr_xyz(self):
         x, y, z = self.curr_loc[0].item(), self.curr_loc[1].item(), self.curr_loc[2].item()
@@ -386,7 +386,6 @@ class QuarTet:
             for i in range(4 - len(tet.neighborhood)):
                 tet.add_neighbor(tet)
 
-
     def merge_same_vertices(self):
         all_vertices = {}
         for tet in self.curr_tetrahedrons:
@@ -433,14 +432,6 @@ class QuarTet:
     def update_occupancy_using_convex_hull(self, convex_hull_mesh):
         signs = mesh_to_sdf(convex_hull_mesh, np.array(self.get_centers()))
         self.update_occupancy_using_sdf(signs)
-
-    def sample_point_cloud(self, pc_size):
-        samples_weights = []
-        for tet in self.curr_tetrahedrons:
-            samples_weights.append((tet.center().curr_loc, tet.occupancy))  # grad of 1
-        samples = torch.stack([x[0] for x in samples_weights])
-        weights = torch.stack([x[1] for x in samples_weights])
-        return samples, weights
 
     def sample_point_cloud(self, pc_size):
         occupied_tets = self.curr_tetrahedrons
@@ -501,7 +492,6 @@ class QuarTet:
             output_file.write(f"tet {n_ver} {len(self.curr_tetrahedrons)}\n")
             output_file.write(''.join(to_write))
 
-
     def export(self, path, export_metadata=True):
         # exporting all the tetrahedrons
         self.export_tet(path)
@@ -540,7 +530,6 @@ class QuarTet:
                 if i % 2000 == 0 and i > 0:
                     print(f'Read {i} tetrhedrons')
 
-
     def load_meta_data(self, path, device='cpu'):
         with open(path, 'r') as meta_data_input:
             if next(meta_data_input).strip() != "occupancies:":
@@ -564,7 +553,6 @@ class QuarTet:
 
             except StopIteration:
                 pass
-
 
     def load(self, path, device, meta_data_path=None):
         """
@@ -694,7 +682,7 @@ class QuarTet:
     def fill_sphere(self):
         cube_center = torch.tensor([[0.5, 0.5, 0.5]])
         for tet in self.curr_tetrahedrons:
-            if torch.cdist(tet.center().curr_loc.unsqueeze(0), cube_center) <= 0.5:
+            if torch.cdist(tet.center().curr_loc.unsqueeze(0), cube_center) <= 0.4:
                 tet.occupancy = torch.tensor(1.)
                 tet.init_occupancy = tet.occupancy.clone()
             else:
@@ -794,4 +782,3 @@ if __name__ == '__main__':
 #     a.export_mesh('./mesh.obj')
 #     a.export_point_cloud('./pc.obj', 10000)
 #     print(a.vertices)
-

@@ -6,7 +6,6 @@
 
 """
 import time
-
 import torch
 
 
@@ -26,6 +25,7 @@ class TetsGroupSharesVertex:
         self.tets_list = tets_list
         self.v = v
         TetsGroupSharesVertex.update_time_monitor(start_time, "init")
+        self.radios = None
 
     @staticmethod
     def update_time_monitor(start_time, key):
@@ -55,8 +55,9 @@ class TetsGroupSharesVertex:
         if tet is not None:
             TetsGroupSharesVertex.update_time_monitor(start_time, "query_direction")
             opposite_face_plane = tet.faces_by_vertex_opposite[self.v.get_original_xyz()].plane
-            return opposite_face_plane.signed_distance(query_point), \
-                   opposite_face_plane.signed_distance(self.v.original_loc)
+            orig_dis = opposite_face_plane.signed_distance(self.v.original_loc)
+            curr_dis = opposite_face_plane.signed_distance(query_point)
+            return max(curr_dis, orig_dis / 2) - orig_dis / 2
         else:
             TetsGroupSharesVertex.counter += 1
             if TetsGroupSharesVertex.counter % 100 == 0:
@@ -73,10 +74,23 @@ class TetsGroupSharesVertex:
             self.tets_list.remove(_to_remove)
         for _to_add in to_add:
             self.tets_list.append(_to_add)
+        self.calculate_max_inner_sphere()
+
+    def calculate_max_inner_sphere(self):
+        self.radios = min(
+            [-tet.faces_by_vertex_opposite[self.v.get_original_xyz()].plane.signed_distance(self.v.original_loc) for tet
+             in self.tets_list])
+        assert self.radios >= 0, "FUCK"
+
+    def inner_sphere_loss(self, move_direction):
+        if self.radios is None:
+            self.calculate_max_inner_sphere()
+        move_direction_norm = torch.norm(move_direction)
+        return max(move_direction_norm, self.radios / 2) - self.radios / 2
 
 
 if __name__ == '__main__':
     import quartet
+
     a = quartet.QuarTet('../objects/cube_0.15.tet')
     x = a.vertices[50]
-

@@ -91,6 +91,7 @@ original_input_xyz = pc.points
 
 quartet_sdf = pc.calc_sdf(quartet.get_centers())
 quartet.update_occupancy_using_sdf(quartet_sdf)
+quartet.fill_sphere()
 
 print("Creating target objects:")
 quartet.export(path=os.path.join(target_path, 'target_quartet.tet'))
@@ -185,8 +186,9 @@ for i in range(range_init, opts.iterations + range_init + 1):
     if i % opts.save_freq == 0 and i > 0:
         save_information(opts, i, net, optimizer, quartet)
 
-    if i - last_subdivide > subdivide_spaces and loss_monitor["quartet_angles_loss"][1] == 0. and loss_monitor[
-        "vertices_movement_bound_loss"][1] == 0.:
+    if i - last_subdivide > subdivide_spaces \
+            and loss_monitor["quartet_angles_loss"][1] * loss_monitor["quartet_angles_loss"][0] == 0. \
+            and loss_monitor["vertices_movement_bound_loss"][1] == 0.:
         print(" Subdivide and fix position ")
 
         quartet.fix_at_position()

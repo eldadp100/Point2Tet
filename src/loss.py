@@ -42,13 +42,10 @@ def chamfer_dist_with_weights_2(tetrahedrons_centers, ground_truth_point_cloud, 
 def vertices_movement_bound_loss(quartet):
     loss_1 = torch.tensor(0.)
     for v in quartet.vertices:
-        loss_v = torch.tensor(0.)
         sd = v.last_update_signed_distance
-        for a, b in zip(*sd):  # TODO: a,b ...
-            loss_v = loss_v + torch.max(a, b / 4) - b / 4  # (we treat the b/2 as constant)
-        loss_1 += loss_v / len(sd)
+        if len(sd) > 0:
+            loss_1 += sum(sd) / len(sd)
     # loss_1 /= len(quartet)
-
     return loss_1
 
 
@@ -75,7 +72,8 @@ def quartet_angles_loss(quartet):
             vectors = [vs[j] - vs[i] for j in range(4) if i != j]
             for k1 in range(3):
                 for k2 in range(k1 + 1, 3):
-                    dp = torch.dot(vectors[k1], vectors[k2]) / torch.sqrt(torch.norm(vectors[k1]) * torch.norm(vectors[k2]))
+                    dp = torch.dot(vectors[k1], vectors[k2]) / torch.sqrt(
+                        torch.norm(vectors[k1]) * torch.norm(vectors[k2]))
                     _loss += torch.max(dp, min_angle_cos) - min_angle_cos
     return _loss
 
@@ -120,8 +118,8 @@ def loss(quartet, pc, pc_points):
 
     loss_monitor = {
         "vertices_movements_chamfer_loss": (1., vertices_movements_chamfer_loss(quartet_pts_1, pc_points)),
-        "vertices_movement_bound_loss": (1., vertices_movement_bound_loss(quartet)),
-        "quartet_angles_loss": (1., quartet_angles_loss(quartet)),
+        "vertices_movement_bound_loss": (1000., vertices_movement_bound_loss(quartet)),
+        "quartet_angles_loss": (0., quartet_angles_loss(quartet)),
         "volumes_loss": (0.3, volumes_loss(quartet)),
         # "occupancy_chamfer_loss": (0., occupancy_chamfer_loss(quartet_pts_2, pc_points, centers_weights)),
         # "occupancy_chamfer_loss_2": (0., occupancy_chamfer_loss_2(quartet_pts_3, pc, centers_weights))
