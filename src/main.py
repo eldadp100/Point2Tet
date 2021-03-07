@@ -141,24 +141,25 @@ for i in range(range_init, opts.iterations + range_init + 1):
     _loss, loss_monitor = loss.loss(quartet, pc, input_xyz)
     print({k: f"{v[1].item() :.5f}" for k, v in loss_monitor.items()})
 
-    if i % 100 == 0:
-        print({k: f"{v[1].item() :.5f}" for k, v in loss_monitor.items()})
-        ######################################################
-        print('occupancy gradient:')
-        grad = net.net_occupancy[0].weight.grad
-        if grad is not None:
-            print(f'max = {grad.max()}, min = {grad.min()}')
-        else:
-            print('None')
-        ######################################################
-        print('movement gradient:')
-        grad = net.net_vertices_movements[0].weight.grad
-        if grad is not None:
-            print(f'max = {grad.max()}, min = {grad.min()}')
-        else:
-            print('None')
-        ######################################################
-        print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
+    # TODO
+    # if i % 100 == 0:
+    #     print({k: f"{v[1].item() :.5f}" for k, v in loss_monitor.items()})
+    #     ######################################################
+    #     print('occupancy gradient:')
+    #     grad = net.net_occupancy[0].weight.grad
+    #     if grad is not None:
+    #         print(f'max = {grad.max()}, min = {grad.min()}')
+    #     else:
+    #         print('None')
+    #     ######################################################
+    #     print('movement gradient:')
+    #     grad = net.net_vertices_movements[0].weight.grad
+    #     if grad is not None:
+    #         print(f'max = {grad.max()}, min = {grad.min()}')
+    #     else:
+    #         print('None')
+    #     ######################################################
+    #     print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
 
     optimizer.zero_grad()
 

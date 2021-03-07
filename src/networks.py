@@ -76,11 +76,11 @@ class OurNet(nn.Module):
             nn.ReLU(),
             nn.Linear(128, 12)
         )  # 3D movement
-        self.net_occupancy = nn.Sequential(
-            nn.Linear(ncf[-1], 128),
-            nn.ReLU(),
-            nn.Linear(128, 1)
-        )  # Binary classifier - occupancy
+        # self.net_occupancy = nn.Sequential(
+        #     nn.Linear(ncf[-1], 128),
+        #     nn.ReLU(),
+        #     nn.Linear(128, 1)
+        # )  # Binary classifier - occupancy
 
     def forward(self, mother_cube):
         for tet in mother_cube:
@@ -90,7 +90,7 @@ class OurNet(nn.Module):
 
         tets_movements = self.net_vertices_movements(tets_features).reshape((-1, 4, 3)).cpu()
         # tets_occupancy = torch.tanh(self.net_occupancy(tets_features)) / 2 + 0.5
-        tets_occupancy = torch.sigmoid(self.net_occupancy(tets_features))
+        # tets_occupancy = torch.sigmoid(self.net_occupancy(tets_features))
 
         for v in mother_cube.vertices:
             v.last_update_signed_distance = []
@@ -99,7 +99,6 @@ class OurNet(nn.Module):
 
         for i, tet in enumerate(mother_cube):
             tet.update_by_deltas(tets_movements[i])
-            tet.occupancy = tets_occupancy[i]
 
 
 def reset_params(model):
