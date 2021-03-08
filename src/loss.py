@@ -115,7 +115,42 @@ def simple_vertices_loss(quartet):
     return ret_loss
 
 
+def mesh_loss(quartet):
+    faces = quartet.create_mesh()
+    # 1. pairs of faces with shared edge
+    # 2. calculate angle of the pairs
+
+    faces_pairs = {}
+    for face in faces:
+        for i, j in [(0, 1), (0, 2), (1, 2)]:
+            shared = (face[i], face[j])
+            key = tuple(sorted(shared, key=lambda x: (x.curr_loc ** 2).sum()))
+            if key not in faces_pairs:
+                faces_pairs[key] = []
+            faces_pairs[key].append(face)
+
+    _loss = torch.tensor(0.)
+    for shared, shared_faces in faces_pairs.items():
+        s1, s2 = shared
+        a = [x for x in shared_faces[0] if x != s1 and x != s2][0].curr_loc
+        b = [x for x in shared_faces[1] if x != s1 and x != s2][0].curr_loc
+        s1 = s1.curr_loc
+        s2 = s2.curr_loc
+        v = s2 - s1
+        vec_a = s1 + (torch.dot(a-s1, v) / torch.dot(v, v)) * v - a
+        vec_b = s1 + (torch.dot(b-s1, v) / torch.dot(v, v)) * v - b
+        cos_angle = torch.dot(vec_a, vec_b) / (torch.norm(vec_a) * torch.norm(vec_b))
+        _loss += (cos_angle + 1).abs()
+        # shared s1, s2. not shared a, b
+        # v = s2-s1, s1 + lambda(v)
+        # vec_a = s1 + (<a-s1, v> / <v, v>) * v
+        # vec_b = s1 + (<a-s1, v> / <v, v>) * v
+        # angle = cos^-1<vec_a, vec_b>
+        # the loss is abs(angle - pi)
+
+    return _loss
 i = [0.]
+
 
 def loss(quartet, pc, pc_points):
     quartet_pts_1 = quartet.sample_point_cloud(pc_points.shape[0])
@@ -132,16 +167,16 @@ def loss(quartet, pc, pc_points):
     if i[0] > 100:
         svbl = 10.
 
-
     loss_monitor = {
         "vertices_movements_chamfer_loss1": (1., vertices_movements_chamfer_loss(quartet_pts_1, pc.points)),
         # "vertices_movements_chamfer_loss1": (1., vertices_movements_chamfer_loss(quartet_pts_1, pc_points)),
         "vertices_movements_chamfer_loss2": (1., vertices_movements_chamfer_loss(quartet_pts_2, pc.points)),
         # "vertices_movements_chamfer_loss2": (1., vertices_movements_chamfer_loss(quartet_pts_2, pc_points)),
-        "simple_vertices_bound_loss": (svbl, simple_vertices_loss(quartet)),
-        # "vertices_movement_bound_loss": (1000., vertices_movement_bound_loss(quartet)),
-        # "quartet_angles_loss": (0., quartet_angles_loss(quartet)),
+        # "simple_vertices_bound_loss": (svbl, simple_vertices_loss(quartet)),
+        "vertices_movement_bound_loss": (50., vertices_movement_bound_loss(quartet)),
+        "quartet_angles_loss": (0., quartet_angles_loss(quartet)),
         "volumes_loss": (10., volumes_loss(quartet)),
+        "mesh sharpness loss": (1., mesh_loss(quartet)),
         # "occupancy_chamfer_loss": (0., occupancy_chamfer_loss(quartet_pts_2, pc_points, centers_weights)),
         # "occupancy_chamfer_loss_2": (0., occupancy_chamfer_loss_2(quartet_pts_3, pc, centers_weights))
         # "occupancy_loss": (1., occupancy_loss_with_sdf(quartet, sdf))

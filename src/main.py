@@ -202,16 +202,17 @@ for i in range(range_init, opts.iterations + range_init + 1):
     # else:
     #     quartet.reset()
     # # print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
-    if i - last_subdivide > subdivide_spaces and loss_monitor["simple_vertices_bound_loss"][1] == 0.:
-        print(" Subdivide and fix position ")
-
-        quartet.fix_at_position()
-        if subdivide_up_to_now < max_subdivides:
-            quartet.subdivide_tets(net)
-            print(len(quartet.curr_tetrahedrons))
-            subdivide_up_to_now += 1
-    else:
-        quartet.reset()
+    # if i - last_subdivide > subdivide_spaces and loss_monitor["simple_vertices_bound_loss"][1] == 0.:
+    #     print(" Subdivide and fix position ")
+    #
+    #     quartet.fix_at_position()
+    #     if subdivide_up_to_now < max_subdivides:
+    #         quartet.subdivide_tets(net)
+    #         print(len(quartet.curr_tetrahedrons))
+    #         subdivide_up_to_now += 1
+    # else:
+    #     quartet.reset()
+    quartet.reset()
     # print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
 
 print(_loss)
