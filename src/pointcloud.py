@@ -45,7 +45,6 @@ class PointCloud:
         self.points -= self.points.permute(1, 0).mean(dim=1)
         self.points /= 2 * self.points.permute(1, 0).abs().max(dim=1).values
         self.points += 0.5
-        self.points /= 2
 
 
     def write_to_file(self, filename):

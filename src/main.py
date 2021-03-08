@@ -85,18 +85,20 @@ else:
 
 pc = PointCloud()
 # pc.load_file(opts.input_filled_pc)
-pc.load_with_normals(opts.input_pc)
+# pc.load_with_normals(opts.input_pc) # TODO
+pc.load_file(opts.input_pc)
 pc.normalize()
 original_input_xyz = pc.points
 
-quartet_sdf = pc.calc_sdf(quartet.get_centers())
-quartet.update_occupancy_using_sdf(quartet_sdf)
+# TODO
+# quartet_sdf = pc.calc_sdf(quartet.get_centers())
+# quartet.update_occupancy_using_sdf(quartet_sdf)
 quartet.fill_sphere()
 
 print("Creating target objects:")
 quartet.export(path=os.path.join(target_path, 'target_quartet.tet'))
 quartet.export_mesh(path=os.path.join(target_path, 'target_mesh.obj'))
-quartet.export_point_cloud(path=os.path.join(target_path, 'target_pc.obj'), n=int(1e4))
+pc.write_to_file(os.path.join(target_path, 'target_pc.obj'))
 print("Finished")
 
 # This is how you visualize the occupied tets pc!
@@ -133,9 +135,9 @@ for i in range(range_init, opts.iterations + range_init + 1):
     iter_start_time = time.time()
 
     # # sample different points every iteration
-    # chamfer_sample_size = min(original_input_xyz.shape[0], opts.chamfer_samples)
-    # indices = np.random.randint(0, original_input_xyz.shape[0], chamfer_sample_size)
-    # input_xyz = original_input_xyz[indices]
+    chamfer_sample_size = min(original_input_xyz.shape[0], opts.chamfer_samples)
+    indices = np.random.randint(0, original_input_xyz.shape[0], chamfer_sample_size)
+    input_xyz = original_input_xyz[indices]
     # TODO: Subdivide every opts.upsamp
     net(quartet)  # in place changes
     _loss, loss_monitor = loss.loss(quartet, pc, input_xyz)
@@ -187,9 +189,20 @@ for i in range(range_init, opts.iterations + range_init + 1):
     if i % opts.save_freq == 0 and i > 0:
         save_information(opts, i, net, optimizer, quartet)
 
-    if i - last_subdivide > subdivide_spaces \
-            and loss_monitor["quartet_angles_loss"][1] * loss_monitor["quartet_angles_loss"][0] == 0. \
-            and loss_monitor["vertices_movement_bound_loss"][1] == 0.:
+    # if i - last_subdivide > subdivide_spaces \
+    #         and loss_monitor["quartet_angles_loss"][1] * loss_monitor["quartet_angles_loss"][0] == 0. \
+    #         and loss_monitor["vertices_movement_bound_loss"][1] == 0.:
+    #     print(" Subdivide and fix position ")
+    #
+    #     quartet.fix_at_position()
+    #     if subdivide_up_to_now < max_subdivides:
+    #         quartet.subdivide_tets(net)
+    #         print(len(quartet.curr_tetrahedrons))
+    #         subdivide_up_to_now += 1
+    # else:
+    #     quartet.reset()
+    # # print(f"iteration {i} finished - {time.time() - iter_start_time} seconds")
+    if i - last_subdivide > subdivide_spaces and loss_monitor["simple_vertices_bound_loss"][1] == 0.:
         print(" Subdivide and fix position ")
 
         quartet.fix_at_position()

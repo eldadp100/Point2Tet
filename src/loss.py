@@ -10,7 +10,7 @@ def pure_chamfer_dist(src_pc, dst_pc):
     chamferDist = ChamferDistance()
     src_pc = src_pc.type(torch.FloatTensor)
     dst_pc = dst_pc.type(torch.FloatTensor)
-    dist = chamferDist.forward(src_pc, dst_pc, bidirectional=True)
+    dist = chamferDist.forward(src_pc, dst_pc, bidirectional=True, reduction="sum")
     return dist
 
 
@@ -108,19 +108,40 @@ def occupancy_loss_with_sdf(quartet, sdf):
     return torch.nn.BCELoss(reduction='sum')(occupancies, ground_truth)
 
 
+def simple_vertices_loss(quartet):
+    ret_loss = torch.tensor(0.)
+    for v in quartet.vertices:
+        ret_loss += torch.norm(v.curr_loc - v.original_loc)
+    return ret_loss
+
+
+i = [0.]
+
 def loss(quartet, pc, pc_points):
     quartet_pts_1 = quartet.sample_point_cloud(pc_points.shape[0])
+    quartet_pts_2 = quartet.sample_point_cloud_2(pc_points.shape[0])
     # quartet_pts_2, centers_weights = quartet.sample_point_cloud_2(pc_points.shape[0])
     # quartet_pts_3, centers_weights = quartet.sample_point_cloud_2(2 * pc_points.shape[0])
 
-    queries = quartet.get_centers()
-    sdf = pc.calc_sdf(queries)
+    # TODO
+    # queries = quartet.get_centers()
+    # sdf = pc.calc_sdf(queries)
+    i[0] += 1
+
+    svbl = 0.
+    if i[0] > 100:
+        svbl = 10.
+
 
     loss_monitor = {
-        "vertices_movements_chamfer_loss": (1., vertices_movements_chamfer_loss(quartet_pts_1, pc_points)),
-        "vertices_movement_bound_loss": (1000., vertices_movement_bound_loss(quartet)),
-        "quartet_angles_loss": (0., quartet_angles_loss(quartet)),
-        "volumes_loss": (0.3, volumes_loss(quartet)),
+        "vertices_movements_chamfer_loss1": (1., vertices_movements_chamfer_loss(quartet_pts_1, pc.points)),
+        # "vertices_movements_chamfer_loss1": (1., vertices_movements_chamfer_loss(quartet_pts_1, pc_points)),
+        "vertices_movements_chamfer_loss2": (1., vertices_movements_chamfer_loss(quartet_pts_2, pc.points)),
+        # "vertices_movements_chamfer_loss2": (1., vertices_movements_chamfer_loss(quartet_pts_2, pc_points)),
+        "simple_vertices_bound_loss": (svbl, simple_vertices_loss(quartet)),
+        # "vertices_movement_bound_loss": (1000., vertices_movement_bound_loss(quartet)),
+        # "quartet_angles_loss": (0., quartet_angles_loss(quartet)),
+        "volumes_loss": (10., volumes_loss(quartet)),
         # "occupancy_chamfer_loss": (0., occupancy_chamfer_loss(quartet_pts_2, pc_points, centers_weights)),
         # "occupancy_chamfer_loss_2": (0., occupancy_chamfer_loss_2(quartet_pts_3, pc, centers_weights))
         # "occupancy_loss": (1., occupancy_loss_with_sdf(quartet, sdf))

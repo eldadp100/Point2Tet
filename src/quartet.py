@@ -451,14 +451,20 @@ class QuarTet:
         return torch.stack(samples)
 
     def sample_point_cloud_2(self, pc_size):
-        samples_weights = []
+        centers = self.get_occupied_centers()
+        vertices = []
+        tmp = set()
         for tet in self.curr_tetrahedrons:
-            samples_weights.append((tet.center().original_loc, tet.occupancy))  # grad of 1
-        samples_weights = random.choices(samples_weights, k=pc_size)
-        samples = torch.stack([x[0] for x in samples_weights])
-        weights = torch.stack([x[1] for x in samples_weights])
-        return samples, weights
-
+            if tet.occupancy > 0.5:
+                for v in tet.vertices:
+                    if v.get_original_xyz() not in tmp:
+                        vertices.append(v)
+                        tmp.add(v.get_original_xyz())
+        vertices = torch.stack([v.curr_loc for v in self.vertices])
+        samples = torch.cat([centers, vertices], dim=0)
+        # samples = random.choices(samples, k=pc_size)
+        # return torch.stack(samples)
+        return samples
     def export_metadata(self, path):
         occupancies_str = []
         neighborhoods_str = []

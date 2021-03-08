@@ -13,9 +13,9 @@ class Options:
         parser.add_argument('--continue_train', action='store_true', help='continue train from latest checkpoint')
         parser.add_argument('--save_freq', type=int, default=100, help='save the model each {save_freq} iterations')
         parser.add_argument('--checkpoint_folder', type=str, default="../checkpoints", help='')
-        parser.add_argument('--init_cube', type=str, default="../objects/cube_0.15.tet", help='.tet format')
+        parser.add_argument('--init_cube', type=str, default="../objects/cube_0.1.tet", help='.tet format')
         parser.add_argument('--input_filled_pc', type=str, default='../objects/filled_sphere.obj', help='.obj format')
-        parser.add_argument('--input_pc', type=str, default='../objects/sphere.ply',
+        parser.add_argument('--input_pc', type=str, default='./filled_sphere.obj',
                             help='input point cloud with normals in .ply format')
         parser.add_argument('--iteration_number', type=int, default=-1,
                             help='the number of iteration to continue from in case of using --continue_train')
@@ -25,7 +25,7 @@ class Options:
         # HYPER PARAMETERS - RECONSTRUCTION
         parser.add_argument('--torch-seed', type=int, metavar='N', default=5, help='torch random seed')
         parser.add_argument('--chamfer_samples', type=int, metavar='N', default=1000, help='resampled every iteration')
-        parser.add_argument('--iterations', type=int, metavar='N', default=10000, help='number of iterations to do')
+        parser.add_argument('--iterations', type=int, metavar='N', default=100000, help='number of iterations to do')
         parser.add_argument('--upsamp', type=int, metavar='N', default=1000, help='upsample each {upsamp} iteration')
 
         # HYPER PARAMETERS - NETWORK
