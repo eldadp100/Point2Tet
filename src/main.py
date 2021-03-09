@@ -85,15 +85,15 @@ else:
 
 pc = PointCloud()
 # pc.load_file(opts.input_filled_pc)
-# pc.load_with_normals(opts.input_pc) # TODO
-pc.load_file(opts.input_pc)
+pc.load_with_normals(opts.input_pc)
+# pc.load_file(opts.input_pc) # TODO
 pc.normalize()
 original_input_xyz = pc.points
 
 # TODO
-# quartet_sdf = pc.calc_sdf(quartet.get_centers())
-# quartet.update_occupancy_using_sdf(quartet_sdf)
-quartet.fill_sphere()
+quartet_sdf = pc.calc_sdf(quartet.get_centers())
+quartet.update_occupancy_using_sdf(quartet_sdf)
+# quartet.fill_sphere()
 
 print("Creating target objects:")
 quartet.export(path=os.path.join(target_path, 'target_quartet.tet'))

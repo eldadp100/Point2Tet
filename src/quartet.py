@@ -11,6 +11,7 @@ import math
 
 from tetrahedral_group import TetsGroupSharesVertex
 import os
+from sklearn.neighbors import radius_neighbors_graph
 
 
 def tensors_eq(v1, v2):
@@ -423,15 +424,6 @@ class QuarTet:
                 occupied_centers.append(tet.center().original_loc)
         return torch.stack(occupied_centers)
 
-    def update_occupancy_using_sdf(self, sdf):
-        for i, tet in enumerate(self.curr_tetrahedrons):
-            if sdf[i] <= 0:
-                tet.occupancy = torch.tensor(1.)
-            else:
-                tet.occupancy = torch.tensor(0.)
-        for tet in self.curr_tetrahedrons:
-            tet.set_as_init_values()
-
     def update_occupancy_using_convex_hull(self, convex_hull_mesh):
         signs = mesh_to_sdf(convex_hull_mesh, np.array(self.get_centers()))
         self.update_occupancy_using_sdf(signs)
@@ -743,8 +735,18 @@ class QuarTet:
         for tet in self.curr_tetrahedrons:
             tet.calculate_half_faces(force=True)
 
-    def fill_occupancy_with_sdf(self):
-        """ leave it to nitzan"""
+    def update_occupancy_using_sdf(self, sdf):
+        for i, tet in enumerate(self.curr_tetrahedrons):
+            if sdf[i] <= 0:
+                tet.occupancy = torch.tensor(1.)
+            else:
+                tet.occupancy = torch.tensor(0.)
+        for tet in self.curr_tetrahedrons:
+            tet.set_as_init_values()
+
+    def update_occupancy_from_filled_point_cloud(self, filled_pc):
+        for tet in self.curr_tetrahedrons:
+            filled_pc
 
     def __getitem__(self, index):
         return self.curr_tetrahedrons[index]
@@ -769,3 +771,4 @@ if __name__ == "__main__":
     quartet = QuarTet(path="../objects/cube_0.05.tet", metadata_path="../quartet_cache/cube_0.05_quartet_data.data")
     quartet.fill_torus(0.3, 0.1, torch.tensor([0.5, 0.5, 0.2]))
     quartet.export("torus_quartet.tet")
+
