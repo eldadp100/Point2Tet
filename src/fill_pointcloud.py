@@ -1,10 +1,8 @@
-import argparse
-import time
-
-import torch
 import pointcloud
 import mesh
+import torch
 import numpy as np
+from _utils import load_obj
 
 
 def face_ray_intersect(ray, face, face_plane):
@@ -168,6 +166,20 @@ class FillPointCloud(pointcloud.PointCloud):
 
         else:
             raise Exception("not valid fill interior method")
+
+
+
+
+class Mesh:
+    def __init__(self, file):
+        self.vs, self.faces = load_obj(file)
+        faces_list = []
+        for f in self.faces:
+            v1, v2, v3 = self.vs[f[0]], self.vs[f[1]], self.vs[f[2]]
+            if sum(v1 == v2) == 3 or sum(v1 == v3) == 3 or sum(v2 == v3) == 3:
+                continue
+            faces_list.append((v1, v2, v3))
+        self.faces = np.array(faces_list)
 
 
 # test

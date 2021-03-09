@@ -744,19 +744,35 @@ class QuarTet:
             tet.set_as_init_values()
 
     def update_occupancy_from_filled_point_cloud(self, filled_pc):
+
+        tets_n_points_inside = []
+
         for tet in self.curr_tetrahedrons:
-            filled_pc
+            hfs_io_points = [(h.plane.coefficients[:-1] * filled_pc).sum(-1) + h.plane.coefficients[-1] <= 0 for h in
+                             tet.half_faces]
+            io_points = hfs_io_points[0]
+            for i in range(1, 4):
+                io_points = io_points * hfs_io_points[i]
+            tets_n_points_inside.append(io_points.sum() / len(io_points))
+
+        tets_n_points_inside = torch.stack(tets_n_points_inside)
+        a = sorted(set([x.item() for x in tets_n_points_inside]))
+        threshold = a[-1] * 0.2  # for noise canceling - take every tet that is 20% filled
+        occupancies = (tets_n_points_inside >= threshold)
+        for i, tet in enumerate(self.curr_tetrahedrons):
+            tet.occupancy = occupancies[i]
+            tet.set_as_init_values()
 
     def __getitem__(self, index):
         return self.curr_tetrahedrons[index]
 
 
 if __name__ == '__main__':
-    a = QuarTet('../objects/cube_0.15.tet', device='cuda')
+    a = QuarTet('../objects/cube_0.1.tet', device='cuda')
     b = PointCloud()
     b.load_file('../objects/filled_g.obj')
-    A = radius_neighbors_graph(b.points, 1.5, mode='connectivity', include_self=True)
-
+    a.update_occupancy_from_filled_point_cloud(b.points)
+    a.export_mesh('./try.obj')
 if __name__ == '__main_1_':
     # a = QuarTet(2, 'cpu')
     a = QuarTet('../objects/cube_0.05.tet')
