@@ -70,15 +70,15 @@ init_cube_prefix, _ = os.path.splitext(os.path.basename(opts.init_cube))
 quartet_cache_name = f'{init_cube_prefix}_quartet_data.data'
 quartet_data_cache = os.path.join(opts.cache_folder, quartet_cache_name)
 
-if os.path.exists(quartet_data_cache):
-    print(f'found quartet data cache, loading quartet metadata from file: {quartet_data_cache}')
-    quartet = QuarTet(opts.init_cube, metadata_path=quartet_data_cache, device=device)
-else:
-    start_creating_quartet = time.time()
-    print("start creating quartet")
-    quartet = QuarTet(opts.init_cube, device)
-    print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
-    quartet.export_metadata(quartet_data_cache)
+# if os.path.exists(quartet_data_cache):
+#     print(f'found quartet data cache, loading quartet metadata from file: {quartet_data_cache}')
+#     quartet = QuarTet(opts.init_cube, metadata_path=quartet_data_cache, device=device)
+# else:
+#     start_creating_quartet = time.time()
+#     print("start creating quartet")
+#     quartet = QuarTet(opts.init_cube, device)
+#     print(f"finished creating quartet - {time.time() - start_creating_quartet} seconds")
+#     quartet.export_metadata(quartet_data_cache)
 
 # input filled point cloud
 # input_xyz, input_normals = torch.rand(100, 3, device=device), torch.rand(100, 3, device=device
@@ -86,14 +86,15 @@ else:
 pc = PointCloud()
 # pc.load_file(opts.input_filled_pc)
 # pc.load_with_normals(opts.input_pc) # TODO
-pc.load_file(opts.input_pc)
+pc.load_file(opts.input_filled_pc)
 pc.normalize()
 original_input_xyz = pc.points
 
 # TODO
 # quartet_sdf = pc.calc_sdf(quartet.get_centers())
 # quartet.update_occupancy_using_sdf(quartet_sdf)
-quartet.fill_sphere()
+# quartet.fill_sphere()
+quartet = QuarTet("../../torus_quartet.tet", device=device, meta_data_path='default')
 
 print("Creating target objects:")
 quartet.export(path=os.path.join(target_path, 'target_quartet.tet'))

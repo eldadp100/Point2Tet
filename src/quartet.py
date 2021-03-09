@@ -749,7 +749,7 @@ class QuarTet:
 if __name__ == '__main_1_':
     # a = QuarTet(2, 'cpu')
     a = QuarTet('../objects/cube_0.05.tet')
-    a.fill_sphere()
+    # a.fill_sphere()
     # for tet in a:
     #     tet.occupancy = torch.tensor(0.)
     # a[5].occupancy = torch.tensor(1.)
