@@ -129,7 +129,11 @@ class Tetrahedron:
 
     def get_faces(self):
         """ returns the four faces making this tetrahedron as a list of 4 tuples of size 3 of Vertex objects """
-        return list(itertools.combinations(self.vertices, 3))
+        return sorted(list(itertools.combinations(self.vertices, 3)), key=id)
+
+    def get_edges(self):
+        """ returns the six edges making this tetrahedron as a list of 6 tuples of size 2 of Vertex objects """
+        return sorted(list(itertools.combinations(self.vertices, 2)), key=id)
 
     def add_face(self, neighbor, face):
         """
@@ -360,10 +364,35 @@ class QuarTet:
     def __init__(self, path='../cube_0.05.tet', device='cpu', metadata_path=None):
         self.curr_tetrahedrons = None
         self.vertices = None
+        self.vertices_to_tets = dict()
         self.load(path, device, meta_data_path=metadata_path)
-
         self.last_vertex_update_average = None
         self.device = device
+
+    def calculate_vertex_features(self):
+        """ :return: a dictionary containing a mapping from a Vertex object to its feature vector """
+        vertex_features = dict()
+        for tet in self.curr_tetrahedrons:
+            for v in tet.vertices:
+                if v not in vertex_features:
+                    vertex_features[v] = tet.features.sum()
+                else:
+                    vertex_features[v] += tet.features.sum()
+        return vertex_features
+
+    def calculate_edges_features(self):
+        """
+        :return: a dictionary containing a mapping from an edge represented by a tuple of 2 vertex objects
+        to its feature vector
+        """
+        edge_features = dict()
+        for tet in self.curr_tetrahedrons:
+            for edge in tet.get_edges():
+                if edge not in edge_features:
+                    edge_features[edge] = tet.features.sum()
+                else:
+                    edge_features[edge] += tet.features.sum()
+        return edge_features
 
     def calculate_and_update_neighborhood(self):
         vertices_to_tets_dict = dict()
@@ -381,6 +410,40 @@ class QuarTet:
                     if neighbor != tet:
                         neighbor.add_neighbor(tet)
                         tet.add_neighbor(neighbor)
+
+    def collapse_edge(self, edge):
+        """
+        Collapses an edge in the quartet object by removing the tetrahedrons touching it and one of its vertices.
+        The vertex to remove is chosen by the minimal norm of the feature vector of the vertex.
+        :param edge: the edge to collapse, represented by a tuple of 2 vertex objects
+        """
+        x, y, z = (edge[0].curr_loc + edge[1].curr_loc) / 2.
+        new_vertex = Vertex(x, y, z)
+        tets_to_check = self.vertices_to_tets[edge[0]].union(self.vertices_to_tets[edge[1]])
+        tets_to_remove = []
+        for tet in tets_to_check:
+            if edge[0] in tet.vertices or edge[1] in tet.vertices:
+                # checking if the tetrahedron is only touching the vertex to remove and not the other, and in that case
+                if edge[0] not in tet.vertices:
+                    tet.vertices.remove(edge[1])
+                    tet.vertices.append(new_vertex)
+                elif edge[1] not in tet.vertices:
+                    tet.vertices.remove(edge[0])
+                    tet.vertices.append(new_vertex)
+                # otherwise it means the edge we collapse is part of the tetrahedron and therefore we want to remove it
+                else:
+                    tets_to_remove.append(tet)
+        for tet in tets_to_remove:
+            self.remove_tet(tet)
+
+    def remove_tet(self, tet):
+        for v in tet.vertices:
+            self.vertices_to_tets[v].remove(tet)
+            if len(self.vertices_to_tets[v]) == 0:
+                self.vertices.remove(v)
+        for neighbor in tet.neighborhood:
+            neighbor.remove_neighbor(tet)
+        self.curr_tetrahedrons.remove(tet)
 
     def fill_neighbors(self):
         for tet in self.curr_tetrahedrons:
@@ -496,12 +559,10 @@ class QuarTet:
     def export(self, path, export_metadata=True):
         # exporting all the tetrahedrons
         self.export_tet(path)
-
         name_without_extension, extension = os.path.splitext(path)
         # exporting the metadata
         if export_metadata:
             self.export_metadata(f'{name_without_extension}_data.data')
-
         # exporting only the occupied tetrahedrons
         self.export_tet(f'{name_without_extension}_filled{extension}', export_only_filled=True)
 
@@ -519,15 +580,20 @@ class QuarTet:
                 if i % 2000 == 0 and i > 0:
                     print(f'Read {i} vertices')
 
-            self.vertices = vertices
+            self.vertices = set(vertices)
             print(f'Finished reading vertices\nReading {int(first_line_split[2])} tetrahedrons')
             for i in range(int(first_line_split[2])):
                 line = input_file.readline()
                 if line == '':
                     continue
                 vertex_indices = line.split(' ')
-                self.curr_tetrahedrons.append(
-                    Tetrahedron([vertices[int(i)] for i in vertex_indices], len(self.curr_tetrahedrons)))
+                curr_vertices = [vertices[int(i)] for i in vertex_indices]
+                new_tetrahedron = Tetrahedron(curr_vertices, len(self.curr_tetrahedrons))
+                self.curr_tetrahedrons.append(new_tetrahedron)
+                for vertex in curr_vertices:
+                    if vertex not in self.vertices_to_tets:
+                        self.vertices_to_tets[vertex] = set()
+                    self.vertices_to_tets[vertex].add(new_tetrahedron)
                 if i % 2000 == 0 and i > 0:
                     print(f'Read {i} tetrhedrons')
 
@@ -581,6 +647,7 @@ class QuarTet:
             self.do_init_calculations()
 
         self.init_setup(device)
+        self.curr_tetrahedrons = set(self.curr_tetrahedrons)
 
     def do_init_calculations(self):
         print('Calculating neighborhoods')
@@ -708,14 +775,15 @@ class QuarTet:
                 tet.init_occupancy = tet.occupancy.clone()
 
     def subdivide_tets(self, net):
-        new_tetrahedrons = []
+        new_tetrahedrons = set()
         vertices = []
         device = self.curr_tetrahedrons[0].features.device
         for i, tet in enumerate(self.curr_tetrahedrons):
             new_tets, center = tet.subdivide()
             new_vertices = [Vertex(*v.get_original_xyz()) for v in tet.vertices] + [center]
             vertices.extend(new_vertices)
-            new_tetrahedrons.extend(new_tets)
+            for new_tet in new_tets:
+                new_tetrahedrons.add(new_tet)
         self.vertices = vertices
         self.curr_tetrahedrons = new_tetrahedrons
 
@@ -762,7 +830,6 @@ class QuarTet:
             tet.set_as_init_values()
 
     def update_occupancy_from_filled_point_cloud(self, filled_pc):
-
         tets_n_points_inside = []
 
         for tet in self.curr_tetrahedrons:

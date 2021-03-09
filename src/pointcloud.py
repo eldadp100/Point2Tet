@@ -4,6 +4,7 @@ from mesh_to_sdf.surface_point_cloud import SurfacePointCloud
 import pyrender
 import trimesh
 from scipy.spatial import ConvexHull
+import os
 
 from _utils import read_pts
 
@@ -23,6 +24,9 @@ class PointCloud:
 
     def load_file(self, path):
         # .obj support only
+        if os.path.splitext(path)[1] != '.obj':
+            raise IOError("File type not supported")
+
         xyz = []
         with open(path, 'r') as f:
             for line in f:
@@ -35,11 +39,6 @@ class PointCloud:
         self.points = torch.tensor(xyz)
 
     def normalize(self):
-        # self.points -= self.points.min()
-        # Z = self.points.permute(1, 0).max(dim=1).values
-        # self.points /= Z
-        # self.normals /= Z
-
         self.points -= self.points.permute(1, 0).mean(dim=1)
         norm_factor = 2 * self.points.abs().max()
         self.points /= norm_factor

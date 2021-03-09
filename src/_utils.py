@@ -244,5 +244,5 @@ def export_ply(vertices, normals, filename):
 if __name__ == '__main__':
     # vs, faces = load_obj('../objects/cube.obj', normalize=True)
     # export('../objects/normalized_cube.obj', vs, faces)
-    # create_torus_point_cloud(filename="../objects/filled_torus_pc.ply", filled=True)
-    create_torus_point_cloud(filename="../objects/torus_pc.ply", normals=True)
+    create_torus_point_cloud(filename="../objects/filled_torus_pc.obj", filled=True)
+    # create_torus_point_cloud(filename="../objects/torus_pc.obj", normals=True)

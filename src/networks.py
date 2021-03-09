@@ -36,13 +36,15 @@ class MotherCubePool(nn.Module):
         super(MotherCubePool, self).__init__()
         self.pool_target = pool_target
 
-    # def pool(self, mother_cube, pool_target):
-    #     sampled_faces = mother_cube.sample_disjoint_faces(pool_target)
-    #     for sampled_face in sampled_faces:
-    #         tet1, tet2 = sampled_face.get_tets()
-    #         shared_features = torch.max(torch.cat([tet1, tet2], dim=1), dim=-1).detach()
-    #         tet1.features = shared_features.clone()
-    #         tet2.features = shared_features.clone()
+    def pool(self, mother_cube):
+        edges_features = mother_cube.calculate_edges_features()
+        # getting a list of all the keys from the dictionary, i.e. the edges
+        edges, features = list(edges_features.keys()), list(edges_features.values())
+        # getting the sorted array
+        features = sorted(list(enumerate(features)), key=lambda x: x[1])
+        num_edges_to_remove = len(features) - self.pool_target
+        for edge_idx, _ in features[:num_edges_to_remove]:
+            mother_cube.collapse_edge(edges[edge_idx])
 
     def unpool(self):
         pass
@@ -54,11 +56,12 @@ class TetCNN_PP(nn.Module):
         self.ncf = ncf
         for i, num_features in enumerate(ncf[:-1]):
             setattr(self, f'conv{i}', MotherCubeConv(num_features, ncf[i + 1]))
-            # setattr(self, f'pool{i}', MotherCubePool(num_features, ))
+            setattr(self, f'pool{i}', MotherCubePool(num_features))
 
     def forward(self, mother_cube):
         for i in range(len(self.ncf) - 1):
             getattr(self, f'conv{i}')(mother_cube)
+            getattr(self, f'pool{i}').pool(mother_cube)
 
 
 class OurNet(nn.Module):
@@ -66,11 +69,8 @@ class OurNet(nn.Module):
         super(OurNet, self).__init__()
 
         ncf = [32, 64, 128, 64]
-        # self.conv_net = TetCNN_PP(ncf)  # TetCNN++
-
-        self.tet_embed = nn.Embedding(number_of_tets, ncf[0])
         self.conv_net = TetCNN_PP(ncf)  # TetCNN++
-
+        self.tet_embed = nn.Embedding(number_of_tets, ncf[0])
         self.net_vertices_movements = nn.Sequential(
             nn.Linear(ncf[-1], 128),
             nn.ReLU(),
@@ -96,7 +96,6 @@ class OurNet(nn.Module):
             v.last_update_signed_distance = []
         for i, tet in enumerate(mother_cube):
             tet.update_move_signed_distance(tets_movements[i])
-
         for i, tet in enumerate(mother_cube):
             tet.update_by_deltas(tets_movements[i])
 

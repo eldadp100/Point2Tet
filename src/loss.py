@@ -145,7 +145,7 @@ def mesh_loss(quartet, mesh_faces):
     for face in mesh_faces:
         for i, j in [(0, 1), (0, 2), (1, 2)]:
             shared = (face[i], face[j])
-            key = tuple(sorted(shared, key=lambda x: (x.curr_loc ** 2).sum()))
+            key = tuple(sorted(shared, key=lambda x: (torch.square(x.curr_loc)).sum()))
             if key not in faces_pairs:
                 faces_pairs[key] = []
             faces_pairs[key].append(face)
