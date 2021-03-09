@@ -1,7 +1,5 @@
 import torch
-import _utils
 import numpy as np
-import mesh
 from mesh_to_sdf.surface_point_cloud import SurfacePointCloud
 import pyrender
 import trimesh
@@ -111,10 +109,10 @@ class PointCloud:
             normals=self.normals
         )
 
-        points = torch.rand(10000, 3)
+        points = torch.rand(40000, 3)
         sdf_vals = spc.get_sdf_in_batches(points)
         ret = points[sdf_vals <= 0]
-        return ret
+        self.points = ret
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ class Options:
         parser.add_argument('--save_freq', type=int, default=50, help='save the model each {save_freq} iterations')
         parser.add_argument('--checkpoint_folder', type=str, default="../checkpoints", help='')
         parser.add_argument('--init_cube', type=str, default="../objects/cube_0.08.tet", help='.tet format')
-        parser.add_argument('--input_pc', type=str, default='../objects/g.ply',
+        parser.add_argument('--input_filled_pc', type=str, default='../objects/filled_sphere.obj',
                             help='input point cloud with normals in .ply format')
         parser.add_argument('--iteration_number', type=int, default=-1,
                             help='the number of iteration to continue from in case of using --continue_train')
