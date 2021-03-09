@@ -7,6 +7,7 @@ from pointcloud import PointCloud
 import itertools
 from scipy.linalg import null_space
 from mesh_to_sdf import mesh_to_sdf
+import math
 
 from tetrahedral_group import TetsGroupSharesVertex
 import os
@@ -428,6 +429,8 @@ class QuarTet:
                 tet.occupancy = torch.tensor(1.)
             else:
                 tet.occupancy = torch.tensor(0.)
+        for tet in self.curr_tetrahedrons:
+            tet.set_as_init_values()
 
     def update_occupancy_using_convex_hull(self, convex_hull_mesh):
         signs = mesh_to_sdf(convex_hull_mesh, np.array(self.get_centers()))
@@ -465,6 +468,7 @@ class QuarTet:
         # samples = random.choices(samples, k=pc_size)
         # return torch.stack(samples)
         return samples
+
     def export_metadata(self, path):
         occupancies_str = []
         neighborhoods_str = []
@@ -745,46 +749,23 @@ class QuarTet:
     def __getitem__(self, index):
         return self.curr_tetrahedrons[index]
 
+    def fill_torus(self, major_radius, minor_radius, center):
+        def check_point(x, y, z):
+            temp = torch.sqrt(x * x + y * y)
+            temp -= major_radius
+            temp *= temp
+            temp += z * z
+            return temp < (minor_radius * minor_radius)
 
-if __name__ == '__main_1_':
-    # a = QuarTet(2, 'cpu')
-    a = QuarTet('../objects/cube_0.05.tet')
-    a.fill_sphere()
-    # for tet in a:
-    #     tet.occupancy = torch.tensor(0.)
-    # a[5].occupancy = torch.tensor(1.)
-    # a.export_point_cloud('./pc.obj', 10000)
-    a.export_mesh('./mesh.obj')
-    a.export(path='quartet.tet')
+        for tet in self.curr_tetrahedrons:
+            point = tet.center().curr_loc - center
+            if check_point(*point):
+                tet.occupancy = torch.tensor(1.)
+            else:
+                tet.occupancy = torch.tensor(0.)
 
-    # pc = PointCloud()
-    # pc.load_file('./filled_sphere.obj')
 
-if __name__ == '__main_1_':
-    a = QuarTet('../objects/cube_0.05.tet')
-    a.fill_sphere()
-    a.export_mesh('./mesh.obj')
-    a.export_point_cloud('./pc.obj', 10000)
-    print(a.vertices)
-
-if __name__ == '__main__':
-    import networks
-
-    a = QuarTet('../objects/cube_0.15.tet', device='cuda')
-    net = networks.OurNet(None, 402).cuda()
-
-    s = time.time()
-    a.subdivide_tets(net)
-    print(f"Time to subdivide {time.time() - s}")
-    s = time.time()
-    net(a)
-    print(f"net applied {time.time() - s}")
-    s = time.time()
-    a.fix_at_position()
-    print(f"position fixed {time.time() - s}")
-    print(len(a.curr_tetrahedrons))
-# if __name__ == '__main__':
-#     a = QuarTet('../checkpoints/default_name/quartet_100.tet')
-#     a.export_mesh('./mesh.obj')
-#     a.export_point_cloud('./pc.obj', 10000)
-#     print(a.vertices)
+if __name__ == "__main__":
+    quartet = QuarTet(path="../objects/cube_0.05.tet", metadata_path="../quartet_cache/cube_0.05_quartet_data.data")
+    quartet.fill_torus(0.3, 0.1, torch.tensor([0.5, 0.5, 0.2]))
+    quartet.export("torus_quartet.tet")
