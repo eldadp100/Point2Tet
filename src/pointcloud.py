@@ -43,9 +43,11 @@ class PointCloud:
         # self.normals /= Z
 
         self.points -= self.points.permute(1, 0).mean(dim=1)
-        self.points /= 2 * self.points.permute(1, 0).abs().max(dim=1).values
+        norm_factor = 2 * self.points.abs().max()
+        self.points /= norm_factor
         self.points += 0.5
-
+        if self.normals is not None:
+            self.normals /= norm_factor
 
     def write_to_file(self, filename):
         with open(filename, "w") as output_file:
@@ -102,33 +104,55 @@ class PointCloud:
         else:
             return hull
 
+    def fill_pc_with_sdf(self):
+        spc = SurfacePointCloud(
+            None,
+            points=self.points,
+            normals=self.normals
+        )
+
+        points = torch.rand(10000, 3)
+        sdf_vals = spc.get_sdf_in_batches(points)
+        ret = points[sdf_vals <= 0]
+        return ret
+
 
 if __name__ == "__main__":
-    # device = 'cpu'
-    # input_xyz, input_normals = _utils.read_pts("../objects/pc.ply")
-    # input_xyz = torch.Tensor(input_xyz).type(torch.FloatTensor).to(device)[None, :,
-    #             :]  # .type() also changes device somewhy on the server
-    # input_normals = torch.Tensor(input_normals).type(torch.FloatTensor).to(device)[None, :, :]
-    # input_xyz, input_normals = input_xyz.squeeze(0), input_normals.squeeze(0)
+    pass
+# device = 'cpu'
+# input_xyz, input_normals = _utils.read_pts("../objects/pc.ply")
+# input_xyz = torch.Tensor(input_xyz).type(torch.FloatTensor).to(device)[None, :,
+#             :]  # .type() also changes device somewhy on the server
+# input_normals = torch.Tensor(input_normals).type(torch.FloatTensor).to(device)[None, :, :]
+# input_xyz, input_normals = input_xyz.squeeze(0), input_normals.squeeze(0)
 
-    # normalize point cloud to [0,1]^3 (Unit Cube)
-    # input_xyz -= input_xyz.permute(1, 0).mean(dim=1)
-    # input_xyz /= 2 * input_xyz.permute(1, 0).max(dim=1).values
-    # input_normals /= 2 * input_xyz.permute(1, 0).max(dim=1).values
-    # input_xyz += 0.5
-    # input_normals += 0.5
+# normalize point cloud to [0,1]^3 (Unit Cube)
+# input_xyz -= input_xyz.permute(1, 0).mean(dim=1)
+# input_xyz /= 2 * input_xyz.permute(1, 0).max(dim=1).values
+# input_normals /= 2 * input_xyz.permute(1, 0).max(dim=1).values
+# input_xyz += 0.5
+# input_normals += 0.5
 
-    # pc = PointCloud()
-    # pc.init_with_points(input_xyz)
-    # pc.fill_iterior_of_point_cloud(method='steps')
-    # pc.write_to_file("pc.obj")
-    #
-    # _mesh = mesh.Mesh('../objects/init_mesh.obj')
-    # pc = PointCloud()
-    # pc.load_file('../pc.obj')
-    # pc.fill_iterior_of_point_cloud(method='mesh', mesh=_mesh)
-    # pc.write_to_file("pc.obj")
+# pc = PointCloud()
+# pc.init_with_points(input_xyz)
+# pc.fill_iterior_of_point_cloud(method='steps')
+# pc.write_to_file("pc.obj")
+#
+# _mesh = mesh.Mesh('../objects/init_mesh.obj')
+# pc = PointCloud()
+# pc.load_file('../pc.obj')
+# pc.fill_iterior_of_point_cloud(method='mesh', mesh=_mesh)
+# pc.write_to_file("pc.obj")
 
+
+if __name__ == '__main__':
+    pc = PointCloud()
+    pc.load_with_normals('../objects/g.ply')
+    pc.normalize()
+    pc.fill_pc_with_sdf()
+    pc.write_to_file('../objects/filled_g.obj')
+
+if __name__ == '__main_1_':
     pc = PointCloud()
     pc.load_file('../objects/filled_sphere.obj')
     xyz = pc.points

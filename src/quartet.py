@@ -10,6 +10,7 @@ from mesh_to_sdf import mesh_to_sdf
 
 from tetrahedral_group import TetsGroupSharesVertex
 import os
+from sklearn.neighbors import radius_neighbors_graph
 
 
 def tensors_eq(v1, v2):
@@ -422,13 +423,6 @@ class QuarTet:
                 occupied_centers.append(tet.center().original_loc)
         return torch.stack(occupied_centers)
 
-    def update_occupancy_using_sdf(self, sdf):
-        for i, tet in enumerate(self.curr_tetrahedrons):
-            if sdf[i] <= 0:
-                tet.occupancy = torch.tensor(1.)
-            else:
-                tet.occupancy = torch.tensor(0.)
-
     def update_occupancy_using_convex_hull(self, convex_hull_mesh):
         signs = mesh_to_sdf(convex_hull_mesh, np.array(self.get_centers()))
         self.update_occupancy_using_sdf(signs)
@@ -465,6 +459,7 @@ class QuarTet:
         # samples = random.choices(samples, k=pc_size)
         # return torch.stack(samples)
         return samples
+
     def export_metadata(self, path):
         occupancies_str = []
         neighborhoods_str = []
@@ -739,12 +734,28 @@ class QuarTet:
         for tet in self.curr_tetrahedrons:
             tet.calculate_half_faces(force=True)
 
-    def fill_occupancy_with_sdf(self):
-        """ leave it to nitzan"""
+    def update_occupancy_using_sdf(self, sdf):
+        for i, tet in enumerate(self.curr_tetrahedrons):
+            if sdf[i] <= 0:
+                tet.occupancy = torch.tensor(1.)
+            else:
+                tet.occupancy = torch.tensor(0.)
+        for tet in self.curr_tetrahedrons:
+            tet.set_as_init_values()
+
+    def update_occupancy_from_filled_point_cloud(self, filled_pc):
+        for tet in self.curr_tetrahedrons:
+            filled_pc
 
     def __getitem__(self, index):
         return self.curr_tetrahedrons[index]
 
+
+if __name__ == '__main__':
+    a = QuarTet('../objects/cube_0.15.tet', device='cuda')
+    b = PointCloud()
+    b.load_file('../objects/filled_g.obj')
+    A = radius_neighbors_graph(b.points, 1.5, mode='connectivity', include_self=True)
 
 if __name__ == '__main_1_':
     # a = QuarTet(2, 'cpu')
@@ -767,7 +778,7 @@ if __name__ == '__main_1_':
     a.export_point_cloud('./pc.obj', 10000)
     print(a.vertices)
 
-if __name__ == '__main__':
+if __name__ == '__main_1_':
     import networks
 
     a = QuarTet('../objects/cube_0.15.tet', device='cuda')
