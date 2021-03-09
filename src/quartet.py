@@ -690,6 +690,23 @@ class QuarTet:
                 tet.occupancy = torch.tensor(0.)
                 tet.init_occupancy = tet.occupancy.clone()
 
+    def fill_torus(self, major_radius, minor_radius, center):
+        def check_point(x, y, z):
+            temp = torch.sqrt(x * x + y * y)
+            temp -= major_radius
+            temp *= temp
+            temp += z * z
+            return temp < (minor_radius * minor_radius)
+
+        for tet in self.curr_tetrahedrons:
+            point = tet.center().curr_loc - center
+            if check_point(*point):
+                tet.occupancy = torch.tensor(1.)
+                tet.init_occupancy = tet.occupancy.clone()
+            else:
+                tet.occupancy = torch.tensor(0.)
+                tet.init_occupancy = tet.occupancy.clone()
+
     def subdivide_tets(self, net):
         new_tetrahedrons = []
         vertices = []
@@ -733,6 +750,7 @@ class QuarTet:
 
         for tet in self.curr_tetrahedrons:
             tet.calculate_half_faces(force=True)
+            tet.set_as_init_values()
 
     def update_occupancy_using_sdf(self, sdf):
         for i, tet in enumerate(self.curr_tetrahedrons):

@@ -136,7 +136,6 @@ def faces_chamfer_loss(mesh_faces, pc_points):
     return cd + cd2
 
 
-
 def mesh_loss(quartet, mesh_faces):
     # 1. pairs of faces with shared edge
     # 2. calculate angle of the pairs
@@ -173,9 +172,6 @@ def mesh_loss(quartet, mesh_faces):
 
         _loss += max((cos_angle + 1).abs(), 0.2) - 0.2
 
-
-
-
         # shared s1, s2. not shared a, b
         # v = s2-s1, s1 + lambda(v)
         # vec_a = s1 + (<a-s1, v> / <v, v>) * v
@@ -199,7 +195,7 @@ def edges_loss(quartet):
     return _loss
 
 
-i = [0.]
+i = [0., None]
 
 
 def loss(quartet, pc, pc_points):
@@ -220,13 +216,13 @@ def loss(quartet, pc, pc_points):
         svbl = 10.
 
     loss_monitor = {
-        "vertices_movements_chamfer_loss1": (1., vertices_movements_chamfer_loss(quartet_pts_1, pc.points)),
-        "vertices_movements_chamfer_loss2": (0.1, vertices_movements_chamfer_loss(quartet_pts_2, pc.points)),
-        "volumes_loss": (10., volumes_loss(quartet)),
-        "mesh_sharpness_loss": (0.2, mesh_loss(quartet, mesh_faces)),
+        "vertices_movements_chamfer_loss1": (50., vertices_movements_chamfer_loss(quartet_pts_1, pc.points)),
+        "vertices_movements_chamfer_loss2": (5., vertices_movements_chamfer_loss(quartet_pts_2, pc.points)),
+        "volumes_loss": (3., volumes_loss(quartet)),
+        "mesh_sharpness_loss": (22., mesh_loss(quartet, mesh_faces)),
         # "vertices_movement_bound_loss": (50., vertices_movement_bound_loss(quartet)),
-        "simple_vertices_bound_loss": (0.1, simple_vertices_loss(quartet)),
-        "edges_loss": (10., edges_loss(quartet)),
+        "simple_vertices_bound_loss": (10., simple_vertices_loss(quartet)),
+        "edges_loss": (5., edges_loss(quartet)),
 
         # "faces_chamfer_loss": (1., faces_chamfer_loss(mesh_faces, pc_points)),
         # "vertices_movements_chamfer_loss1": (0., vertices_movements_chamfer_loss(quartet_pts_1, pc.points)),
@@ -240,20 +236,15 @@ def loss(quartet, pc, pc_points):
         # "vertices_movements_chamfer_loss2": (1., vertices_movements_chamfer_loss(quartet_pts_2, pc_points)),
         # "simple_vertices_bound_loss": (svbl, simple_vertices_loss(quartet)),
 
-
-
-
-
         # "occupancy_chamfer_loss": (0., occupancy_chamfer_loss(quartet_pts_2, pc_points, centers_weights)),
         # "occupancy_chamfer_loss_2": (0., occupancy_chamfer_loss_2(quartet_pts_3, pc, centers_weights))
         # "occupancy_loss": (1., occupancy_loss_with_sdf(quartet, sdf))
     }
 
-    # if i > 100:
-    #     global const_loss_monitor
-    #     const_loss_monitor = loss_monitor
-
-
+    if i[0] == 100:
+        i[1] = loss_monitor
+    if i[1] is not None:
+        loss_monitor = {loss_name: (loss_val[0], loss_val[1] / float(i[1][loss_name][1])) for loss_name, loss_val in loss_monitor.items()}
     return sum([lambda_i * loss_i for lambda_i, loss_i in loss_monitor.values()]), loss_monitor
 
 #
