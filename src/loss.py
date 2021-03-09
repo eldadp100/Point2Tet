@@ -3,7 +3,7 @@ import random
 
 import torch
 from chamferdist import ChamferDistance
-from weighted_chamferdist import ChamferDistance as Weighted_CD
+# from weighted_chamferdist import ChamferDistance as Weighted_CD
 import numpy as np
 
 
@@ -15,13 +15,13 @@ def pure_chamfer_dist(src_pc, dst_pc):
     return dist
 
 
-def chamfer_dist_with_weights(tetrahedrons_centers, ground_truth_point_cloud, tetrahedrons_weights):
-    chamferDist = Weighted_CD()
-    src_pc = tetrahedrons_centers.type(torch.FloatTensor)
-    dst_pc = ground_truth_point_cloud.type(torch.FloatTensor)
-    src_weights = tetrahedrons_weights.type(torch.FloatTensor)
-    dist = chamferDist.forward(src_pc, dst_pc, src_weights)
-    return dist
+# def chamfer_dist_with_weights(tetrahedrons_centers, ground_truth_point_cloud, tetrahedrons_weights):
+#     chamferDist = Weighted_CD()
+#     src_pc = tetrahedrons_centers.type(torch.FloatTensor)
+#     dst_pc = ground_truth_point_cloud.type(torch.FloatTensor)
+#     src_weights = tetrahedrons_weights.type(torch.FloatTensor)
+#     dist = chamferDist.forward(src_pc, dst_pc, src_weights)
+#     return dist
 
 
 def chamfer_dist_with_weights_2(tetrahedrons_centers, ground_truth_point_cloud, tetrahedrons_weights):
