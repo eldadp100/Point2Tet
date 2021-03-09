@@ -86,7 +86,7 @@ quartet_data_cache = os.path.join(opts.cache_folder, quartet_cache_name)
 pc = PointCloud()
 # pc.load_file(opts.input_filled_pc)
 # pc.load_with_normals(opts.input_pc) # TODO
-pc.load_file(opts.input_filled_pc)
+pc.load_file("../../filled_torus_pc.obj")
 pc.normalize()
 original_input_xyz = pc.points
 
@@ -94,7 +94,7 @@ original_input_xyz = pc.points
 # quartet_sdf = pc.calc_sdf(quartet.get_centers())
 # quartet.update_occupancy_using_sdf(quartet_sdf)
 # quartet.fill_sphere()
-quartet = QuarTet("../../torus_quartet.tet", device=device, meta_data_path='default')
+quartet = QuarTet("../../torus_quartet.tet", device=device, metadata_path='default')
 
 print("Creating target objects:")
 quartet.export(path=os.path.join(target_path, 'target_quartet.tet'))
