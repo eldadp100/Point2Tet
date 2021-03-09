@@ -106,7 +106,7 @@ def export_ply(vertices, normals, filename):
 
 
 def create_torus_point_cloud(major_radius=0.5, minor_radius=None, aspect_ratio=3., offset=(0.5, 0.5, 0.), filename='torus.obj',
-                 N=int(1e4), normals=True):
+                 N=int(1e4), normals=True, filled=False):
     """
     Creates a torus point cloud (only shell), and writes it to an .obj or .ply file
     :param major_radius: the major radius of the torus (the distance between center of donut's perimeter and the center of the donut)
@@ -116,46 +116,64 @@ def create_torus_point_cloud(major_radius=0.5, minor_radius=None, aspect_ratio=3
     :param filename: the file name to export the created torus to; if None no file is created
     :param N: the number of points to sample
     :param normals: if True exports the point cloud with normals
+    :param filled: if True creates a filled torus; if both normals and filled are True creates a filled torus without normals
     :return: a torch.tensor containing the points (of shape [N, 3])
     """
+    result, normals = None, None
+
     if minor_radius is None:
         minor_radius = major_radius / aspect_ratio
 
-    rng = np.random.default_rng()
-    thetas, phis = rng.uniform(high=360., size=N), rng.uniform(high=360., size=N)
+    if filled:
+        minor_radiuses = [(a / 10) * minor_radius for a in range(1, 10)]
+        points_count = [int((a ** 2 / 100) * N) for a in range(1, 10)]
+        normals = False
 
-    def get_point(ct, cp, st, sp):
-        """ ct = cos(theta); cp = cos(phi); st = sin(theta); sp = sin(phi) """
-        temp = major_radius + minor_radius * ct
-        return torch.cat([
-            torch.tensor([temp * cp]),
-            torch.tensor([temp * sp]),
-            torch.tensor([minor_radius * st])
-        ])
+    def create_torus(minor_radius, points_count):
+        rng = np.random.default_rng()
+        thetas, phis = rng.uniform(high=360., size=points_count), rng.uniform(high=360., size=points_count)
 
-    def get_normal(ct, cp, st, sp):
-        temp = minor_radius * ct
-        return torch.cat([
-            torch.tensor([temp * cp]),
-            torch.tensor([temp * sp]),
-            torch.tensor([minor_radius * st])
-        ])
+        def get_point(ct, cp, st, sp):
+            """ ct = cos(theta); cp = cos(phi); st = sin(theta); sp = sin(phi) """
+            temp = major_radius + minor_radius * ct
+            return torch.cat([
+                torch.tensor([temp * cp]),
+                torch.tensor([temp * sp]),
+                torch.tensor([minor_radius * st])
+            ])
 
-    cts, cps, sts, sps = np.cos(thetas), np.cos(phis), np.sin(thetas), np.sin(phis)
-    result = torch.stack([get_point(ct, cp, st, sp) for ct, cp, st, sp in
-                          zip(cts, cps, sts, sps)])
-    result += torch.tensor(offset)
-    if normals:
-        normal_vectors = torch.stack([get_normal(ct, cp, st, sp) for ct, cp, st, sp in zip(cts, cps, sts, sps)])
+        def get_normal(ct, cp, st, sp):
+            temp = minor_radius * ct
+            return torch.cat([
+                torch.tensor([temp * cp]),
+                torch.tensor([temp * sp]),
+                torch.tensor([minor_radius * st])
+            ])
 
+        cts, cps, sts, sps = np.cos(thetas), np.cos(phis), np.sin(thetas), np.sin(phis)
+        result = torch.stack([get_point(ct, cp, st, sp) for ct, cp, st, sp in
+                              zip(cts, cps, sts, sps)])
+        result += torch.tensor(offset)
+        normal_vectors = None
+        if normals:
+            normal_vectors = torch.stack([get_normal(ct, cp, st, sp) for ct, cp, st, sp in zip(cts, cps, sts, sps)])
+        return result, normal_vectors
+
+    result, normals = create_torus(minor_radius, N)
+    if filled:
+        for r, n in zip(minor_radiuses, points_count):
+            new_result, new_normals = create_torus(r, n)
+            result = torch.cat([result, new_result])
+            if normals:
+                normals = torch.cat([normals, new_normals])
 
     if filename is not None:
         split = os.path.splitext(filename)
         if len(split) > 1:
             if split[1] == '.obj':
-                export_obj(result, normal_vectors, filename)
+                export_obj(result, normals, filename)
             elif split[1] == '.ply':
-                export_ply(result, normal_vectors, filename)
+                export_ply(result, normals, filename)
             else:
                 raise IOError("Error: File format not supported!")
 
@@ -166,4 +184,5 @@ def create_torus_point_cloud(major_radius=0.5, minor_radius=None, aspect_ratio=3
 if __name__ == '__main__':
     # vs, faces = load_obj('../objects/cube.obj', normalize=True)
     # export('../objects/normalized_cube.obj', vs, faces)
-    create_torus_point_cloud(filename="torus_pc.ply", normals=True)
+    # create_torus_point_cloud(filename="../objects/filled_torus_pc.ply", filled=True)
+    create_torus_point_cloud(filename="../objects/torus_pc.ply", normals=True)
