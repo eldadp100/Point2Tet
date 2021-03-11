@@ -35,7 +35,7 @@ class Tetrahedron:
         self.faces_by_vertex_opposite = {}
 
         for v in self.vertices:
-            self.faces_by_vertex[v.get_original_xyz()] = []
+            self.faces_by_vertex[v] = []
 
         self.init_features = None
         self.init_vertices = None
@@ -152,10 +152,10 @@ class Tetrahedron:
         self.half_faces.append(new_half_face)
 
         for v in face:
-            self.faces_by_vertex[v.get_original_xyz()].append(new_half_face)
+            self.faces_by_vertex[v].append(new_half_face)
         for v in self.vertices:
             if v not in face:
-                self.faces_by_vertex_opposite[v.get_original_xyz()] = new_half_face
+                self.faces_by_vertex_opposite[v] = new_half_face
 
     def calculate_half_faces(self, force=False):
         """ :param force: If True the half faces will be recalculated """
@@ -190,6 +190,12 @@ class Tetrahedron:
             vertices_i = half_face.get_vertices() + [center]
             ret_tets.append(Tetrahedron(vertices_i, tet_num=self.tet_num.item()))
         return ret_tets, center
+
+    def replace_vertex(self, prev_vertex, new_vertex):
+        self.vertices.remove(prev_vertex)
+        self.vertices.append(new_vertex)
+        self.faces_by_vertex[new_vertex] = self.faces_by_vertex.pop(prev_vertex)
+        self.faces_by_vertex_opposite[new_vertex] = self.faces_by_vertex_opposite.pop(prev_vertex)
 
 
 def vertices_intersection(ver1, ver2):
@@ -333,7 +339,8 @@ class Vertex:
         return (x, y, z).__hash__()
 
     def __eq__(self, other):
-        return self.get_original_xyz() == other.get_original_xyz()
+        # return self.get_original_xyz() == other.get_original_xyz()
+        return id(self) == id(other)
 
     def __ge__(self, other):
         x, y, z = self.original_loc
@@ -356,7 +363,7 @@ class Vertex:
         return not (self >= other)
 
     def set_tets_group(self, tets_list):
-        assert self.tets_group is None
+        # assert self.tets_group is None
         self.tets_group = TetsGroupSharesVertex(self, tets_list)
 
 
@@ -395,16 +402,10 @@ class QuarTet:
         return edge_features
 
     def calculate_and_update_neighborhood(self):
-        vertices_to_tets_dict = dict()
-        for vertex in self.vertices:
-            vertices_to_tets_dict[vertex] = set()
-        for tet in self.curr_tetrahedrons:
-            for vertex in tet:
-                vertices_to_tets_dict[vertex].add(tet)
-
+        self.init_vertices_to_tet()
         for tet in self.curr_tetrahedrons:
             for face in tet.get_faces():
-                neighbor_set = set.intersection(*[vertices_to_tets_dict[vertex] for vertex in face])
+                neighbor_set = set.intersection(*[self.vertices_to_tets[vertex] for vertex in face])
                 assert (len(neighbor_set) == 1 or len(neighbor_set) == 2)
                 for neighbor in neighbor_set:
                     if neighbor != tet:
@@ -419,22 +420,34 @@ class QuarTet:
         """
         x, y, z = (edge[0].curr_loc + edge[1].curr_loc) / 2.
         new_vertex = Vertex(x, y, z)
+        self.vertices_to_tets[new_vertex] = set()
+        self.vertices.add(new_vertex)
         tets_to_check = self.vertices_to_tets[edge[0]].union(self.vertices_to_tets[edge[1]])
         tets_to_remove = []
         for tet in tets_to_check:
-            if edge[0] in tet.vertices or edge[1] in tet.vertices:
-                # checking if the tetrahedron is only touching the vertex to remove and not the other, and in that case
-                if edge[0] not in tet.vertices:
-                    tet.vertices.remove(edge[1])
-                    tet.vertices.append(new_vertex)
-                elif edge[1] not in tet.vertices:
-                    tet.vertices.remove(edge[0])
-                    tet.vertices.append(new_vertex)
-                # otherwise it means the edge we collapse is part of the tetrahedron and therefore we want to remove it
-                else:
-                    tets_to_remove.append(tet)
+            if tet in self.curr_tetrahedrons:
+                if edge[0] in tet.vertices or edge[1] in tet.vertices:
+                    # checking if the tetrahedron is only touching the vertex to remove and not the other, and in that case
+                    if edge[0] not in tet.vertices:
+                        # replacing edge[1] with new_vertex
+                        tet.replace_vertex(edge[1], new_vertex)
+                        self.vertices_to_tets[new_vertex].add(tet)
+                    elif edge[1] not in tet.vertices:
+                        tet.replace_vertex(edge[0], new_vertex)
+                        self.vertices_to_tets[new_vertex].add(tet)
+                    # otherwise it means the edge we collapse is part of the tetrahedron and therefore we want to remove it
+                    else:
+                        tets_to_remove.append(tet)
         for tet in tets_to_remove:
             self.remove_tet(tet)
+
+    def collapse_edges(self, edges, device=None):
+        if device is None:
+            device = self.device
+        for edge in edges:
+            self.collapse_edge(edge)
+
+        self.init_setup(device, True)
 
     def remove_tet(self, tet):
         for v in tet.vertices:
@@ -590,10 +603,6 @@ class QuarTet:
                 curr_vertices = [vertices[int(i)] for i in vertex_indices]
                 new_tetrahedron = Tetrahedron(curr_vertices, len(self.curr_tetrahedrons))
                 self.curr_tetrahedrons.append(new_tetrahedron)
-                for vertex in curr_vertices:
-                    if vertex not in self.vertices_to_tets:
-                        self.vertices_to_tets[vertex] = set()
-                    self.vertices_to_tets[vertex].add(new_tetrahedron)
                 if i % 2000 == 0 and i > 0:
                     print(f'Read {i} tetrhedrons')
 
@@ -611,11 +620,11 @@ class QuarTet:
 
                 next_line = next(meta_data_input).strip()
                 for tet in self:
-                    curr_neighborhood = []
+                    curr_neighborhood = set()
                     neighbor_indexes = next_line.split(', ')
                     for idx in neighbor_indexes:
-                        curr_neighborhood.append(self.curr_tetrahedrons[int(idx)])
-                    tet.neighborhood = curr_neighborhood.copy()
+                        curr_neighborhood.add(self.curr_tetrahedrons[int(idx)])
+                    tet.neighborhood = curr_neighborhood
                     next_line = next(meta_data_input).strip()
 
             except StopIteration:
@@ -640,20 +649,16 @@ class QuarTet:
             if meta_data_path == 'default':
                 base_name = os.path.splitext(path)[0]
                 meta_data_path = f"{base_name}_data.data"
-
             if os.path.exists(meta_data_path):
                 self.load_meta_data(meta_data_path, device)
+            self.init_setup(device)
         else:
-            self.do_init_calculations()
-
-        self.init_setup(device)
+            self.init_setup(device, True)
         self.curr_tetrahedrons = set(self.curr_tetrahedrons)
 
     def do_init_calculations(self):
         print('Calculating neighborhoods')
         self.calculate_and_update_neighborhood()
-        # print('Filling neighbors')
-        # self.fill_neighbors()
         print('Merge same vertices')
         self.merge_same_vertices()
 
@@ -665,7 +670,10 @@ class QuarTet:
             for hf in tet.half_faces:
                 hf.set_orientation()
 
-    def init_setup(self, device):
+    def init_setup(self, device, do_init_calculations=False):
+        if do_init_calculations:
+            self.do_init_calculations()
+
         for tet in self.curr_tetrahedrons:
             tet.occupancy = tet.occupancy.cpu()
             tet.features = tet.features.to(device)
@@ -677,22 +685,23 @@ class QuarTet:
         for tet in self.curr_tetrahedrons:
             tet.features.requires_grad_()
 
+        self.init_vertices_to_tet()
         self.init_half_faces()
-
-        vertex_tet_dict = {}
-        for tet in self.curr_tetrahedrons:
-            for v in tet.vertices:
-                if v not in vertex_tet_dict:
-                    vertex_tet_dict[v] = []
-                vertex_tet_dict[v].append(tet)
-
-        for v, v_tets_list in vertex_tet_dict.items():
-            v.set_tets_group(v_tets_list)
+        for v, v_tets_list in self.vertices_to_tets.items():
+            v.set_tets_group(list(v_tets_list))
             for tet in v_tets_list:
                 assert len(tet.faces_by_vertex) != 0
 
         for tet in self.curr_tetrahedrons:
             tet.set_as_init_values()
+
+    def init_vertices_to_tet(self):
+        self.vertices_to_tets.clear()
+        for tet in self.curr_tetrahedrons:
+            for v in tet.vertices:
+                if v not in self.vertices_to_tets:
+                    self.vertices_to_tets[v] = set()
+                self.vertices_to_tets[v].add(tet)
 
     def reset(self):
         for tet in self.curr_tetrahedrons:
@@ -788,15 +797,17 @@ class QuarTet:
         self.curr_tetrahedrons = new_tetrahedrons
 
         # neighbors + half faces calculations
-        self.do_init_calculations()
-        self.init_setup(device)
-        self.init_half_faces()
+        self.init_setup(device, True)
 
         # update embeddings
+        self.update_tetrahedrons_embedding(net)
+
+
+    def update_tetrahedrons_embedding(self, net):
         old_embedding = net.tet_embed.state_dict()["weight"]
         new_embedding_weights = torch.empty((old_embedding.shape[0] * 4, *old_embedding.shape[1:]))
 
-        for i, tet in enumerate(new_tetrahedrons):
+        for i, tet in enumerate(self.curr_tetrahedrons):
             new_embedding_weights[i] = old_embedding[tet.tet_num]
             tet.tet_num = torch.tensor(i, device=old_embedding.device)
         new_embedding_weights.to(old_embedding.device)
@@ -804,8 +815,6 @@ class QuarTet:
         net.tet_embed = torch.nn.Embedding(*new_embedding_weights.shape)
         net.tet_embed.load_state_dict({"weight": new_embedding_weights})
         net.tet_embed.to(old_embedding.device)
-
-        self.curr_tetrahedrons = new_tetrahedrons
 
     def fix_at_position(self):
         """

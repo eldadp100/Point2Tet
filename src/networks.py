@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch import optim
 from quartet import QuarTet, Tetrahedron
-
+import numpy as np
 import os
 
 NEIGHBORHOOD_SIZE = 5
@@ -43,8 +43,8 @@ class MotherCubePool(nn.Module):
         # getting the sorted array
         features = sorted(list(enumerate(features)), key=lambda x: x[1])
         num_edges_to_remove = len(features) - self.pool_target
-        for edge_idx, _ in features[:num_edges_to_remove]:
-            mother_cube.collapse_edge(edges[edge_idx])
+        # for edge_idx, _ in features[:num_edges_to_remove]:
+        mother_cube.collapse_edges(np.array(edges)[np.array(features)[:num_edges_to_remove, 0].astype(int)])
 
     def unpool(self):
         pass
