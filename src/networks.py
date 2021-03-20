@@ -32,17 +32,16 @@ class MotherCubeConv(nn.Module):
 
 
 class MotherCubePool(nn.Module):
-    def __init__(self, pool_target):
+    def __init__(self):
         super(MotherCubePool, self).__init__()
-        self.pool_target = pool_target
 
-    def pool(self, mother_cube):
+    def pool(self, mother_cube, pool_ratio):
         edges_features = mother_cube.calculate_edges_features()
         # getting a list of all the keys from the dictionary, i.e. the edges
         edges, features = list(edges_features.keys()), list(edges_features.values())
         # getting the sorted array
         features = sorted(list(enumerate(features)), key=lambda x: x[1])
-        num_edges_to_remove = len(features) - self.pool_target
+        num_edges_to_remove = int(pool_ratio * len(features))
         # for edge_idx, _ in features[:num_edges_to_remove]:
         mother_cube.collapse_edges(np.array(edges)[np.array(features)[:num_edges_to_remove, 0].astype(int)])
 
@@ -51,17 +50,22 @@ class MotherCubePool(nn.Module):
 
 
 class TetCNN_PP(nn.Module):
-    def __init__(self, ncf):
+    def __init__(self, ncf, pr):
         super(TetCNN_PP, self).__init__()
         self.ncf = ncf
+        self.pr = pr
         for i, num_features in enumerate(ncf[:-1]):
             setattr(self, f'conv{i}', MotherCubeConv(num_features, ncf[i + 1]))
-            setattr(self, f'pool{i}', MotherCubePool(num_features))
+        # for pool_ratio in enumerate(pr[:-1]):
+        #     setattr(self, f'pool{i}', MotherCubePool())
+        self.pool = MotherCubePool()
 
     def forward(self, mother_cube):
+        print("POOL:")
         for i in range(len(self.ncf) - 1):
             getattr(self, f'conv{i}')(mother_cube)
-            getattr(self, f'pool{i}').pool(mother_cube)
+            self.pool.pool(mother_cube, self.pr[i])
+            print(f'\ti = {i}: {len(mother_cube)}')
 
 
 class OurNet(nn.Module):
@@ -69,7 +73,8 @@ class OurNet(nn.Module):
         super(OurNet, self).__init__()
 
         ncf = [32, 64, 128, 64]
-        self.conv_net = TetCNN_PP(ncf)  # TetCNN++
+        pr = [0.3] * 4
+        self.conv_net = TetCNN_PP(ncf, pr)  # TetCNN++
         self.tet_embed = nn.Embedding(number_of_tets, ncf[0])
         self.net_vertices_movements = nn.Sequential(
             nn.Linear(ncf[-1], 128),
@@ -88,7 +93,7 @@ class OurNet(nn.Module):
         self.conv_net(mother_cube)
         tets_features = torch.stack([tet.features for tet in mother_cube])
 
-        tets_movements = self.net_vertices_movements(tets_features).reshape((-1, 4, 3)).cpu()
+        tets_movements = self.net_vertices_movements(tets_features).reshape((-1, 4, 3))
         # tets_occupancy = torch.tanh(self.net_occupancy(tets_features)) / 2 + 0.5
         # tets_occupancy = torch.sigmoid(self.net_occupancy(tets_features))
 

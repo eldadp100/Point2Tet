@@ -110,7 +110,7 @@ def occupancy_loss_with_sdf(quartet, sdf):
 
 
 def simple_vertices_loss(quartet):
-    ret_loss = torch.tensor(0.)
+    ret_loss = torch.tensor(0., device=quartet.device)
     for v in quartet.vertices:
         ret_loss += torch.norm(v.curr_loc - v.original_loc)
     return ret_loss
@@ -139,8 +139,11 @@ def faces_chamfer_loss(mesh_faces, pc_points):
 def mesh_loss(quartet, mesh_faces):
     # 1. pairs of faces with shared edge
     # 2. calculate angle of the pairs
+    for face in mesh_faces:
+        device = face[0].curr_loc.device
+        break
     if len(mesh_faces) == 0:
-        return torch.tensor(0.)
+        return torch.tensor(0., device=device)
     faces_pairs = {}
     for face in mesh_faces:
         for i, j in [(0, 1), (0, 2), (1, 2)]:
@@ -150,7 +153,7 @@ def mesh_loss(quartet, mesh_faces):
                 faces_pairs[key] = []
             faces_pairs[key].append(face)
 
-    _loss = torch.tensor(0.)
+    _loss = torch.tensor(0., device=device)
     for shared, shared_faces in faces_pairs.items():
         if len(shared_faces) != 2:
             continue

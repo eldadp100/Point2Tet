@@ -25,7 +25,7 @@ quartet_data_cache = os.path.join(opts.cache_folder, quartet_cache_name)
 
 if os.path.exists(quartet_data_cache):
     print(f'found quartet data cache, loading quartet metadata from file: {quartet_data_cache}')
-    quartet = QuarTet(opts.init_cube, metadata_path=quartet_data_cache, device=device)
+    quartet = QuarTet(opts.init_cube, metadata_path=quartet_data_cache, device=torch.device('cpu'))
 else:
     start_creating_quartet = time.time()
     print("start creating quartet")
@@ -70,9 +70,11 @@ if opts.continue_train:
         range_init = opts.iteration_number
 
 _utils.save_information(opts, 0, net, optimizer, quartet)
+
+quartet.to(device)
+
 for i in range(range_init, opts.iterations + range_init + 1):
     iter_start_time = time.time()
-
     # sample different points every iteration
     chamfer_sample_size = min(original_input_xyz.shape[0], opts.chamfer_samples)
     indices = np.random.randint(0, original_input_xyz.shape[0], chamfer_sample_size)

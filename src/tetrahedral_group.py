@@ -78,14 +78,14 @@ class TetsGroupSharesVertex:
 
     def calculate_max_inner_sphere(self):
         self.radios = min(
-            [-tet.faces_by_vertex_opposite[self.v.get_original_xyz()].plane.signed_distance(self.v.original_loc) for tet
+            [-tet.faces_by_vertex_opposite[self.v].plane.signed_distance(self.v.original_loc) for tet
              in self.tets_list])
         assert self.radios >= 0, "FUCK"
 
     def inner_sphere_loss(self, move_direction):
         if self.radios is None:
             self.calculate_max_inner_sphere()
-        move_direction_norm = torch.norm(move_direction)
+        move_direction_norm = torch.norm(move_direction).cpu()
         return max(move_direction_norm, self.radios / 2) - self.radios / 2
 
 
