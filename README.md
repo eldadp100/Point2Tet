@@ -11,12 +11,17 @@ Point2Tet is a novel deep neural network to learn Tetrahedral Meshed from 3d poi
 * Install dependecies (requires PyTorch).
 * Run main.py using Python (version 3.x.x).
 
-# Important CLI Parameters
+## Important CLI Parameters
 1. --name: The name of the generated folder in which the data will be saved
-2. --save_freq: The frequency to save the model and export the resulting point cloud, mesh and tetrahedral mesh object
-3. --input_cube: Path to the file containing the file to load as the initial tetrahedral mesh (a cube is assumed in .tet format)
-4. --input_filled_pc: Path to the filled point cloud to use as input
+2. --input_cube: Controls resolution. Path to the file containing the file to load as the initial tetrahedral mesh (a cube is assumed in .tet format)
+3. --input_filled_pc: Path to the filled point cloud to use as input. (.obj format)
+4. --input_surface_pc: [Optional] Path to the surface point cloud (without normals) to use as additional input. (.obj format)
 
+## Examples
+1. sphere: python main.py --name sphere --init_cube ../objects/cube_0.05.tet --input_filled_pc ../objects/filled_sphere.obj --input_surface_pc ../objects/surface_sphere.obj 
+2. torus: python main.py --name sphere --init_cube ../objects/cube_0.05.tet --input_filled_pc ../objects/filled_torus.obj --input_surface_pc ../objects/surface_torus.obj
+3. G: python main.py --name sphere --init_cube ../objects/cube_0.05.tet --input_filled_pc ../objects/filled_g.obj --input_surface_pc ../objects/surface_g.obj
+* Execute from src folder.
 # Results
 <table>
   <tr>
